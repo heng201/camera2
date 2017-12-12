@@ -1,6 +1,6 @@
 # camera2
 
-拍照预览，录像等等     
+camera2的使用，camera1的使用，连拍的实现，拍照预览，录像等等  
 
 app下为camera2的使用 ，camera1下为camera1的使用，radio下为录像的实现和连拍的使用。
 
