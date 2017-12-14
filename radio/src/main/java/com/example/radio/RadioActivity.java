@@ -2,9 +2,11 @@ package com.example.radio;
 
 import android.app.Activity;
 
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.ImageFormat;
+import android.graphics.PixelFormat;
 import android.hardware.Camera;
 import android.media.CamcorderProfile;
 import android.media.MediaMetadataRetriever;
@@ -14,6 +16,8 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -40,7 +44,8 @@ public class RadioActivity extends Activity implements View.OnClickListener {
     private MediaRecorder mediaRecorder;
     private String mFileName;
     private Camera camera;
-    private static ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
+    //private static ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
+    private  static  ExecutorService  singleThreadExecutor = Executors.newSingleThreadExecutor();
     /**
      * 是否开始录像
      */
@@ -189,6 +194,7 @@ public class RadioActivity extends Activity implements View.OnClickListener {
 
 
         mediaRecorder.setPreviewDisplay(surfaceHolder.getSurface());
+
         try {
             mediaRecorder.prepare();
         } catch (IOException e) {
@@ -202,8 +208,13 @@ public class RadioActivity extends Activity implements View.OnClickListener {
      * 暂停录像
      */
     private void stopRecording() {
+
         if(mediaRecorder == null)
             return;
+        //设置后不会崩
+        /*mediaRecorder.setOnErrorListener(null);
+        mediaRecorder.setOnInfoListener(null);
+        mediaRecorder.setPreviewDisplay(null);*/
         mediaRecorder.stop();
         mediaRecorder.reset();
         mediaRecorder.release();
@@ -243,7 +254,7 @@ public class RadioActivity extends Activity implements View.OnClickListener {
             //System.out.print("saveImages: for 进入");
             final int finalI = i;
             final int pictureNum = picturenum;
-            cachedThreadPool.execute(new Runnable() {
+            singleThreadExecutor.execute(new Runnable() {
                 @Override
                 public void run() {
                     //参数为微妙
@@ -307,7 +318,17 @@ public class RadioActivity extends Activity implements View.OnClickListener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // 去掉标题栏 ,必须放在setContentView之前
+        //requestWindowFeature(Window.FEATURE_NO_TITLE);
+
         setContentView(R.layout.activity_radio);
+        // 设置横屏显示
+        //setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        // 设置全屏
+//        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+//                WindowManager.LayoutParams.FLAG_FULLSCREEN);
+//        // 选择支持半透明模式,在有surfaceview的activity中使用。
+//        getWindow().setFormat(PixelFormat.TRANSLUCENT);
         //初始化
         findViews();
     }
