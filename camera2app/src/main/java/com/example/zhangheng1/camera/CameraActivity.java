@@ -9,29 +9,37 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.ImageFormat;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.graphics.YuvImage;
+import android.hardware.Camera;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.MeteringRectangle;
+import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.Surface;
@@ -44,6 +52,7 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -57,6 +66,8 @@ import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
@@ -68,6 +79,8 @@ import static android.support.v4.math.MathUtils.clamp;
 public class CameraActivity extends Activity implements View.OnClickListener {
 
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
+    private static int  CONTROL_AF_MODE = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE;
+    private static int  CONTROL_AE_MODE = CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH;
 
     ///为了使照片竖直显示
     static {
@@ -85,10 +98,12 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     private Button btnTakephoto;
     private Button btn_startrecord;
     private ImageView ivPhotes;
+    private SeekBar sb_focusdistant;
     private Handler handler1, handler2, mainHandler;
     private CameraDevice mCameraDevice;
     private CaptureRequest.Builder preCameraCaptureRequest;
     private ImageReader imageReader;
+    private ImageReader imageReaderTakePictures;
     /**
      * 图片的地址
      */
@@ -122,6 +137,38 @@ public class CameraActivity extends Activity implements View.OnClickListener {
      */
     private boolean isStartRecord = false;
     private CaptureRequest.Builder mRecordBuilder;
+    /**
+     * camera数据
+     */
+    private CameraCharacteristics characteristics;
+    private StreamConfigurationMap map;
+    /**
+     * 对焦框
+     */
+    private FocusFrameView focusFrameView;
+    /**
+     * 最小的焦距值
+     */
+    private Float minimumLens;
+
+
+    /**
+     * 消失对焦框
+     */
+    private static int REFRESHFOCUSVIEW = 1;
+    private Handler messageHandler = new Handler(){
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if(msg.what == REFRESHFOCUSVIEW) {
+                focusFrameView.setVisibility(View.GONE);
+                //messageHandler.removeMessages(REFRESHFOCUSVIEW);
+            }
+
+
+        }
+    };
+
 
 
     /**
@@ -135,6 +182,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         tvLight = (TextView) findViewById(R.id.tv_light);
         btnTakephoto = (Button) findViewById(R.id.btn_takephoto);
         ivPhotes = (ImageView) findViewById(R.id.iv_photes);
+        sb_focusdistant = findViewById(R.id.sb_focusdistant);
         btn_startrecord = findViewById(R.id.btn_startrecord);
 
 
@@ -156,8 +204,92 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         btnTakephoto.setOnLongClickListener(new MyOnLongClickListener());
         ivPhotes.setOnClickListener(this);
         tvLight.setOnClickListener(this);
+        sb_focusdistant.setOnSeekBarChangeListener(new MyOnSeekBarChangeListener());
     }
 
+    /**
+     * seekbar的监听
+     */
+    class MyOnSeekBarChangeListener implements SeekBar.OnSeekBarChangeListener {
+
+        @Override
+        public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+            //Toast.makeText(CameraActivity.this, " " +i , Toast.LENGTH_SHORT).show();
+            float focusDistance = (((float) i) * minimumLens / 100);
+            Log.d(TAG, "onProgressChanged:num " + focusDistance + " seek " + i);
+            rePreFocusDisplay(focusDistance);
+
+
+        }
+
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {
+            Log.d(TAG, "onStartTrackingTouch: seek按下");
+
+        }
+
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {
+
+        }
+    }
+    /**
+     * 开始预览
+     */
+    private void rePreFocusDisplay(final float focusDistance) {
+
+
+
+        try {
+            // 创建预览需要的CaptureRequest.Builder
+            previewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            // 将SurfaceView的surface作为CaptureRequest.Builder的目标
+            previewRequestBuilder.addTarget(surfaceHolder.getSurface());
+            previewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_OFF);
+            previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focusDistance);
+            previewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, (long) ((214735991 - 13231) / 2));
+            previewRequestBuilder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, 0);
+            previewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, (10000 - 100) / 2);
+            //3A--->auto
+            previewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+            //3A
+            previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+            previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF);
+            previewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO);
+            // 创建CameraCaptureSession，该对象负责管理处理预览请求和拍照请求
+            mCameraDevice.createCaptureSession(Arrays.asList(surfaceHolder.getSurface(), imageReader.getSurface()), new CameraCaptureSession.StateCallback() // ③
+            {
+                @Override
+                public void onConfigured(CameraCaptureSession cameraCaptureSession) {
+                    if (null == mCameraDevice) {
+                        //Toast.makeText(MainActivity.this, "mCameraDevice is null", Toast.LENGTH_SHORT).show();
+                        Log.d(TAG, "onConfigured: ");
+                        return;
+                    }
+                    // 当摄像头已经准备好时，开始显示预览
+                    mCameraCaptureSession = cameraCaptureSession;
+                    try {
+                        // 显示预览
+                        CaptureRequest previewRequest = previewRequestBuilder.build();
+                        mCameraCaptureSession.setRepeatingRequest(previewRequest, null, handler1);
+                    } catch (CameraAccessException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+
+                @Override
+                public void onConfigureFailed(CameraCaptureSession cameraCaptureSession) {
+                    //Toast.makeText(CameraActivity.this, "配置失败", Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "onConfigureFailed: 配置失败");
+                }
+            }, handler1);
+
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+
+    }
     /**
      * surfaceview 的点击监听
      */
@@ -166,108 +298,91 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         @Override
         public boolean onTouch(View view, MotionEvent motionEvent) {
             // 先取相对于view上面的坐标
-            double x = motionEvent.getX(), y = motionEvent.getY(), tmp;
+            //double x = motionEvent.getX(), y = motionEvent.getY(), tmp;
+            //Log.d(TAG, "onTouch: x" + x + " y : " + y);
 
-            // 取出来的图像如果有旋转角度的话，则需要将宽高交换下
-            int realPreviewWidth = 1080, realPreviewHeight = 1920;
+            //重绘对焦框
+            refreshFocusView((int)motionEvent.getX(),(int)motionEvent.getY());
+            final Rect sensorArraySize = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+            //TODO: here I just flip x,y, but this needs to correspond with the sensor orientation (via SENSOR_ORIENTATION)
+            //得到触摸点对应的图像点
+            final int y = (int)((motionEvent.getX() / (float)view.getWidth())  * (float)sensorArraySize.height());
+            final int x = (int)((motionEvent.getY() / (float)view.getHeight()) * (float)sensorArraySize.width());
+            final int halfTouchWidth  = 300; //(int)motionEvent.getTouchMajor(); //TODO: this doesn't represent actual touch size in pixel. Values range in [3, 10]...
+            final int halfTouchHeight = 300; //(int)motionEvent.getTouchMinor();
+            Log.d(TAG, "onTouch: x" + x + " y : " + y);
+            final MeteringRectangle focusAreaTouch = new MeteringRectangle(Math.max(x - halfTouchWidth,  0),
+                    Math.max(y - halfTouchHeight, 0),
+                    halfTouchWidth  * 2,
+                    halfTouchHeight * 2,
+                    MeteringRectangle.METERING_WEIGHT_MAX - 1);
+           //closePreviewSession();
+            /**
+             * 更新预览界面
+             */
+            rePreview(focusAreaTouch);
+            return false;
+        }
+    }
 
-            // 计算摄像头取出的图像相对于view放大了多少，以及有多少偏移
-            double imgScale = 1.0, verticalOffset = 0, horizontalOffset = 0;
-            if (realPreviewHeight * view.getWidth() > realPreviewWidth * view.getHeight()) {
-                imgScale = view.getWidth() * 1.0 / realPreviewWidth;
-                verticalOffset = (realPreviewHeight - view.getHeight() / imgScale) / 2;
-            } else {
-                imgScale = view.getHeight() * 1.0 / realPreviewHeight;
-                horizontalOffset = (realPreviewWidth - view.getWidth() / imgScale) / 2;
-            }
+    private void rePreview(final MeteringRectangle focusAreaTouch) {
+        try {
+            // 创建预览需要的CaptureRequest.Builder
+            previewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            // 将SurfaceView的surface作为CaptureRequest.Builder的目标
+            previewRequestBuilder.addTarget(surfaceHolder.getSurface());
+            // 创建CameraCaptureSession，该对象负责管理处理预览请求和拍照请求
+            mCameraDevice.createCaptureSession(Arrays.asList(surfaceHolder.getSurface(), imageReader.getSurface()), new CameraCaptureSession.StateCallback() // ③
+            {
+                @Override
+                public void onConfigured(CameraCaptureSession cameraCaptureSession) {
+                    if (null == mCameraDevice) {
+                        //Toast.makeText(MainActivity.this, "mCameraDevice is null", Toast.LENGTH_SHORT).show();
+                        Log.d(TAG, "onConfigured: ");
+                        return;
+                    }
+                    // 当摄像头已经准备好时，开始显示预览
+                    mCameraCaptureSession = cameraCaptureSession;
+                    try {
 
-           // 将点击的坐标转换为图像上的坐标
-            x = x / imgScale + horizontalOffset;
-            y = y / imgScale + verticalOffset;
-
-            tmp = x; x = y; y = 1920 - tmp;
-
-            // 计算取到的图像相对于裁剪区域的缩放系数，以及位移
-            Rect cropRegion = previewRequestBuilder.get(CaptureRequest.SCALER_CROP_REGION);
-            if (null == cropRegion) {
-                Log.e(TAG, "can't get crop region");
-                //cropRegion = mActiveArraySize;
-                Log.d(TAG, "onTouch: null == cropRegion");
-            }
-
-            int cropWidth = cropRegion.width(), cropHeight = cropRegion.height();
-            if (1920 * cropWidth > 1080 * cropHeight) {
-                imgScale = cropHeight * 1.0 / 1920;
-                verticalOffset = 0;
-                horizontalOffset = (cropWidth - imgScale * 1080) / 2;
-            } else {
-                imgScale = cropWidth * 1.0 / 1080;
-                horizontalOffset = 0;
-                verticalOffset = (cropHeight - imgScale * 1920) / 2;
-            }
-
-            // 将点击区域相对于图像的坐标，转化为相对于成像区域的坐标
-            x = x * imgScale + horizontalOffset + cropRegion.left;
-            y = y * imgScale + verticalOffset + cropRegion.top;
-
-            double tapAreaRatio = 0.1;
-            final Rect rect = new Rect();
-            rect.left = clamp((int) (x - tapAreaRatio / 2 * cropRegion.width()), 0, cropRegion.width());
-            rect.right = clamp((int) (x + tapAreaRatio / 2 * cropRegion.width()), 0, cropRegion.width());
-            rect.top = clamp((int) (y - tapAreaRatio / 2 * cropRegion.height()), 0, cropRegion.height());
-            rect.bottom = clamp((int) (y + tapAreaRatio / 2 * cropRegion.height()), 0, cropRegion.height());
-
-            closePreviewSession();
-
-            try {
-                // 创建预览需要的CaptureRequest.Builder
-                previewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-                // 将SurfaceView的surface作为CaptureRequest.Builder的目标
-                previewRequestBuilder.addTarget(surfaceHolder.getSurface());
-                // 创建CameraCaptureSession，该对象负责管理处理预览请求和拍照请求
-                mCameraDevice.createCaptureSession(Arrays.asList(surfaceHolder.getSurface(), imageReader.getSurface()), new CameraCaptureSession.StateCallback() // ③
-                {
-                    @Override
-                    public void onConfigured(CameraCaptureSession cameraCaptureSession) {
-                        if (null == mCameraDevice) {
-                            //Toast.makeText(MainActivity.this, "mCameraDevice is null", Toast.LENGTH_SHORT).show();
-                            Log.d(TAG, "onConfigured: ");
-                            return;
-                        }
-                        // 当摄像头已经准备好时，开始显示预览
-                        mCameraCaptureSession = cameraCaptureSession;
-
-                        previewRequestBuilder.set(CaptureRequest.CONTROL_AF_REGIONS, new MeteringRectangle[] {new MeteringRectangle(rect, 1000)});
-                        previewRequestBuilder.set(CaptureRequest.CONTROL_AE_REGIONS, new MeteringRectangle[] {new MeteringRectangle(rect, 1000)});
+                        // 显示预览
+                        previewRequestBuilder.set(CaptureRequest.CONTROL_AF_REGIONS, new MeteringRectangle[]{focusAreaTouch});
+                        previewRequestBuilder.set(CaptureRequest.CONTROL_AE_REGIONS, new MeteringRectangle[]{focusAreaTouch});
+                        previewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
                         previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO);
                         previewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
-                        previewRequestBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER, CameraMetadata.CONTROL_AE_PRECAPTURE_TRIGGER_START);
-                            CaptureRequest captureRequest = previewRequestBuilder.build();
-                        try {
-                            mCameraCaptureSession.setRepeatingRequest(captureRequest, null , handler1);
-                        } catch (CameraAccessException e) {
-                            e.printStackTrace();
-                        }
-
-
+                        //previewRequestBuilder.setTag("FOCUS_TAG"); //we'll capture this later for resuming the preview
+                        CaptureRequest previewRequest = previewRequestBuilder.build();
+                        mCameraCaptureSession.setRepeatingRequest(previewRequest, null, handler1);
+                    } catch (CameraAccessException e) {
+                        e.printStackTrace();
                     }
 
-                    @Override
-                    public void onConfigureFailed(CameraCaptureSession cameraCaptureSession) {
-                        //Toast.makeText(CameraActivity.this, "配置失败", Toast.LENGTH_SHORT).show();
-                        Log.d(TAG, "onConfigureFailed: 配置失败");
-                    }
-                }, handler1);
+                }
 
-            } catch (CameraAccessException e) {
-                e.printStackTrace();
-            }
+                @Override
+                public void onConfigureFailed(CameraCaptureSession cameraCaptureSession) {
+                    //Toast.makeText(CameraActivity.this, "配置失败", Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "onConfigureFailed: 配置失败");
+                }
+            }, handler1);
 
-
-
-
-            return true;
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
         }
+    }
+
+    /**
+     * 重绘focusview
+     */
+    private void refreshFocusView(int x,int y) {
+        focusFrameView.setmCenterX(x);
+        focusFrameView.setmCenterY(y);
+        focusFrameView.invalidate();
+        //focusFrameView.refreshDrawableState();
+        focusFrameView.setVisibility(View.VISIBLE);
+        messageHandler.removeMessages(REFRESHFOCUSVIEW);
+        messageHandler.sendEmptyMessageDelayed(REFRESHFOCUSVIEW,2000);
     }
 
     /**
@@ -324,8 +439,6 @@ public class CameraActivity extends Activity implements View.OnClickListener {
      * 停止录像
      */
     private void stopRecord() {
-
-
         mediaRecorder.stop();
         mediaRecorder.release();
         mediaRecorder = null;
@@ -503,32 +616,49 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         handler1 = new Handler(handlerThread.getLooper());
         mainHandler = new Handler(getMainLooper());
         mCameraID = "" + CameraCharacteristics.LENS_FACING_FRONT;//后摄像头
-
-
-        imageReader = ImageReader.newInstance(1080, 1920, ImageFormat.JPEG, 50);
-
-        imageReader.setOnImageAvailableListener(new MyOnImageAvailableListener(), mainHandler);
-
         //获取摄像头管理
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-
             //打开摄像头
             Log.d("MyCamera", "打开摄像头成功");
-
-
             cameraManager.openCamera(mCameraID, stateCallback, mainHandler);
-            CameraCharacteristics characteristics
-                    = cameraManager.getCameraCharacteristics(mCameraID);
-            Integer integer = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
-            Log.d(TAG, "initCamera: " + integer.toString());
-
+            characteristics = cameraManager.getCameraCharacteristics(mCameraID);
         } catch (CameraAccessException e) {
             e.printStackTrace();
             Log.d("MyCamera", "打开摄像头失败");
         }
+
+        //获取最小的焦距值
+        minimumLens = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+
+
+        Log.d(TAG, "initCamera: " + minimumLens + " ca " );
+        map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+        Integer integer = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+        Log.d(TAG, "initCamera: " + integer.toString());
+        Size largest = Collections.max(
+                Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+                new CompareSizesByArea());
+        //设置最大的图像尺寸
+        imageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(), ImageFormat.JPEG, 50);
+        imageReader.setOnImageAvailableListener(new MyOnImageAvailableListener(), mainHandler);
+        imageReaderTakePictures = ImageReader.newInstance(1080, 1920, ImageFormat.JPEG, 50);
+        imageReaderTakePictures.setOnImageAvailableListener(new MyPicturesOnImageAvailableListener(), mainHandler);
     }
 
+    /**
+     * Compares two {@code Size}s based on their areas.
+     */
+    static class CompareSizesByArea implements Comparator<Size> {
+
+        @Override
+        public int compare(Size lhs, Size rhs) {
+            // We cast here to ensure the multiplications won't overflow
+            return Long.signum((long) lhs.getWidth() * lhs.getHeight() -
+                    (long) rhs.getWidth() * rhs.getHeight());
+        }
+
+    }
     /**
      * 当有多个权限需要申请的时候
      * 这里以打电话和SD卡读写权限为例
@@ -668,6 +798,42 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     /**
      * 图片数据准备好的监听，获取图片
      */
+    class MyPicturesOnImageAvailableListener implements ImageReader.OnImageAvailableListener {
+
+        @Override
+        public void onImageAvailable(ImageReader imageReader) {
+
+            //mCameraDevice.close();
+            //mSurfaceView.setVisibility(View.GONE);
+            // 拿到拍照照片数据
+            Image image = imageReader.acquireNextImage();
+            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+            byte[] bytes = new byte[buffer.remaining()];
+            buffer.get(bytes);//由缓冲区存入字节数组
+            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            num++;
+            if(num > 100){
+                Toast.makeText( CameraActivity.this, "照片够多了", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Log.d(TAG, "onImageAvailable: saveimage " + num);
+            if (bitmap != null) {
+
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssmm").format(new Date());
+                String bitmapPath = "/sdcard/" + timeStamp + num + ".png";
+
+                new ImageSaver(bytes, bitmapPath).start();
+                picturesPath.add(bitmapPath);
+                ivPhotes.setImageBitmap(bitmap);
+                Log.d(TAG, "onImageAvailable: saveimage in " + bitmapPath + num);
+            } else {
+                Log.d(TAG, "onImageAvailable: null");
+            }
+        }
+    }
+    /**
+     * 图片数据准备好的监听，获取图片
+     */
     class MyOnImageAvailableListener implements ImageReader.OnImageAvailableListener {
 
         @Override
@@ -713,7 +879,6 @@ public class CameraActivity extends Activity implements View.OnClickListener {
 
             //imageReader.close();
             //imageReader = ImageReader.newInstance(1080, 1920, ImageFormat.JPEG, 30);
-
             //imageReader.setOnImageAvailableListener(new MyOnImageAvailableListener(), mainHandler);
             //连拍
             takePictures();
@@ -741,7 +906,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             CaptureRequest mCaptureRequest = takePictureRequestBuilder.build();
 
             List<CaptureRequest> list = new LinkedList<>();
-            for (int i = 0; i < 30; i++) {
+            for (int i = 0; i < 10; i++) {
                 list.add(mCaptureRequest);
             }
 
@@ -888,8 +1053,12 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                     try {
                         // 自动对焦
                         previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-                        // 打开闪光灯
-                        previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH);
+                        // 自动曝光
+                        previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CONTROL_AE_MODE);
+                        //previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF);
+                        //previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
+
+                        //previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, (float) 100);
                         // 显示预览
                         CaptureRequest previewRequest = previewRequestBuilder.build();
                         mCameraCaptureSession.setRepeatingRequest(previewRequest, null, handler1);
@@ -927,6 +1096,10 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         // 去掉标题栏 ,必须放在setContentView之前
         //requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_camera);
+        focusFrameView = new FocusFrameView(CameraActivity.this, 540,960,200,200, Color.BLUE);
+      //在一个activity上面添加额外的content
+        addContentView(focusFrameView, new WindowManager.LayoutParams(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT));
+        focusFrameView.setVisibility(View.GONE);
         // 设置横屏显示
         //setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         // 设置全屏
@@ -934,11 +1107,21 @@ public class CameraActivity extends Activity implements View.OnClickListener {
 //                WindowManager.LayoutParams.FLAG_FULLSCREEN);
 //        // 选择支持半透明模式,在有surfaceview的activity中使用。
 //        getWindow().setFormat(PixelFormat.TRANSLUCENT);
-
         findViews();
-
-
-
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if(messageHandler != null) {
+            messageHandler.removeCallbacksAndMessages(null);
+        }
+        if(handler1 != null) {
+            handler1.removeCallbacksAndMessages(null);
+        }
+        if(mainHandler != null) {
+            mainHandler.removeCallbacksAndMessages(null);
+        }
+
+    }
 }
