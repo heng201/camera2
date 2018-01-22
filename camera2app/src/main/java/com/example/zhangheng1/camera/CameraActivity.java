@@ -12,6 +12,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
@@ -39,6 +40,7 @@ import android.support.v4.app.ActivityCompat;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.util.Range;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.MotionEvent;
@@ -78,6 +80,7 @@ import static android.support.v4.math.MathUtils.clamp;
 
 public class CameraActivity extends Activity implements View.OnClickListener {
 
+
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private static int  CONTROL_AF_MODE = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE;
     private static int  CONTROL_AE_MODE = CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH;
@@ -99,6 +102,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     private Button btn_startrecord;
     private ImageView ivPhotes;
     private SeekBar sb_focusdistant;
+    private SeekBar sb_isosetting;
     private Handler handler1, handler2, mainHandler;
     private CameraDevice mCameraDevice;
     private CaptureRequest.Builder preCameraCaptureRequest;
@@ -138,7 +142,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     private boolean isStartRecord = false;
     private CaptureRequest.Builder mRecordBuilder;
     /**
-     * camera数据
+     * camera数据属性
      */
     private CameraCharacteristics characteristics;
     private StreamConfigurationMap map;
@@ -150,12 +154,35 @@ public class CameraActivity extends Activity implements View.OnClickListener {
      * 最小的焦距值
      */
     private Float minimumLens;
+    /**
+     * 传感器的信息ISO
+     */
+    private Range<Integer> integerRange;
 
-
+    /**
+     * 传感器的最大值
+     */
+    private Integer maxISO;
+    /**
+     * 传感器的最小值
+     */
+    private Integer minISO;
+    /**
+     * 要设置的iso的值
+     */
+    private int isoValue;
+    /**
+     * 固定焦距值
+     */
+    private float focusDistance;
     /**
      * 消失对焦框
      */
-    private static int REFRESHFOCUSVIEW = 1;
+    private static int REFRESHFOCUSVIEW = 0;
+    private static int LIGHTOPEN = 1;
+    private static int LIGHTCLOSE = 2;
+    private static int LIGHTAUTO = 3;
+    private static int LIGHTOPENORCLOSE = CaptureRequest.FLASH_MODE_OFF;
     private Handler messageHandler = new Handler(){
         @Override
         public void handleMessage(Message msg) {
@@ -163,6 +190,12 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             if(msg.what == REFRESHFOCUSVIEW) {
                 focusFrameView.setVisibility(View.GONE);
                 //messageHandler.removeMessages(REFRESHFOCUSVIEW);
+            }else if (msg.what == LIGHTCLOSE) {
+                tvLight.setText("闪光灯关闭");
+            } else if (msg.what == LIGHTOPEN) {
+                tvLight.setText("闪光灯打开");
+            }else if(msg.what == LIGHTAUTO){
+                tvLight.setText("闪光灯自动");
             }
 
 
@@ -183,6 +216,8 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         btnTakephoto = (Button) findViewById(R.id.btn_takephoto);
         ivPhotes = (ImageView) findViewById(R.id.iv_photes);
         sb_focusdistant = findViewById(R.id.sb_focusdistant);
+        sb_isosetting = findViewById(R.id.sb_isosetting);
+        
         btn_startrecord = findViewById(R.id.btn_startrecord);
 
 
@@ -204,20 +239,22 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         btnTakephoto.setOnLongClickListener(new MyOnLongClickListener());
         ivPhotes.setOnClickListener(this);
         tvLight.setOnClickListener(this);
-        sb_focusdistant.setOnSeekBarChangeListener(new MyOnSeekBarChangeListener());
+        sb_focusdistant.setOnSeekBarChangeListener(new MyFocusOnSeekBarChangeListener());
+        sb_isosetting.setOnSeekBarChangeListener(new MyIsoOnSeekBarChangeListener());
     }
 
     /**
-     * seekbar的监听
+     * foucs手动seekbar的监听
      */
-    class MyOnSeekBarChangeListener implements SeekBar.OnSeekBarChangeListener {
+    class MyFocusOnSeekBarChangeListener implements SeekBar.OnSeekBarChangeListener {
 
         @Override
         public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
             //Toast.makeText(CameraActivity.this, " " +i , Toast.LENGTH_SHORT).show();
-            float focusDistance = (((float) i) * minimumLens / 100);
+            focusDistance = (((float) i) * minimumLens / 100);
             Log.d(TAG, "onProgressChanged:num " + focusDistance + " seek " + i);
-            rePreFocusDisplay(focusDistance);
+            //重新开始预览
+            rePreFocusAndISODisplay(focusDistance,isoValue);
 
 
         }
@@ -233,29 +270,54 @@ public class CameraActivity extends Activity implements View.OnClickListener {
 
         }
     }
+
     /**
-     * 开始预览
+     * iso手动设置的监听
      */
-    private void rePreFocusDisplay(final float focusDistance) {
+    class MyIsoOnSeekBarChangeListener implements SeekBar.OnSeekBarChangeListener {
+
+        @Override
+        public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+            Log.d(TAG, "ISO onProgressChanged: " + i + seekBar.getProgress());
+            isoValue = ((i * (maxISO - minISO)/*/100*/)  + minISO);
+            Log.d(TAG, "onProgressChanged: isovalue" + isoValue);
+            rePreFocusAndISODisplay(focusDistance,isoValue);
+
+        }
+
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {
+
+        }
+
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {
+
+        }
+    }
 
 
-
+    /**
+     * 重新开始固定焦距和ISO的预览
+     */
+    private void rePreFocusAndISODisplay(float focusDistance,int isoValue) {
         try {
             // 创建预览需要的CaptureRequest.Builder
             previewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             // 将SurfaceView的surface作为CaptureRequest.Builder的目标
             previewRequestBuilder.addTarget(surfaceHolder.getSurface());
-            previewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_OFF);
+            //previewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_OFF);
             previewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, focusDistance);
-            previewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, (long) ((214735991 - 13231) / 2));
-            previewRequestBuilder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, 0);
-            previewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, (10000 - 100) / 2);
+            previewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, isoValue);
+            //previewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, (long) ((214735991 - 13231) / 2));
+            //previewRequestBuilder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, 0);
+           // previewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, (10000 - 100) / 2);
             //3A--->auto
-            previewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+            previewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_OFF);
             //3A
             previewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF);
             previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF);
-            previewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO);
+            //previewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO);
             // 创建CameraCaptureSession，该对象负责管理处理预览请求和拍照请求
             mCameraDevice.createCaptureSession(Arrays.asList(surfaceHolder.getSurface(), imageReader.getSurface()), new CameraCaptureSession.StateCallback() // ③
             {
@@ -395,15 +457,11 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.btn_takephoto:
-
-
                 //imageReader.close();
                 //imageReader = ImageReader.newInstance(1080, 1920, ImageFormat.JPEG, 1);
-
                 //imageReader.setOnImageAvailableListener(new MyOnImageAvailableListener(), mainHandler);
                 //拍照
                 takePicture();
-
                 break;
             case R.id.iv_photes:
                 //进入照片预览
@@ -411,6 +469,19 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                 break;
             case R.id.tv_light:
 
+                //闪光灯开启或关闭
+                //开启或关闭闪光灯
+                Toast.makeText(CameraActivity.this, "闪光灯", Toast.LENGTH_SHORT).show();
+                if (LIGHTOPENORCLOSE == CaptureRequest.FLASH_MODE_OFF) {
+                    LIGHTOPENORCLOSE = CaptureRequest.FLASH_MODE_TORCH;
+                    messageHandler.sendEmptyMessage(LIGHTOPEN);
+                } else if (LIGHTOPENORCLOSE == CaptureRequest.FLASH_MODE_TORCH){
+                    LIGHTOPENORCLOSE = CaptureRequest.FLASH_MODE_SINGLE;
+                    messageHandler.sendEmptyMessage(LIGHTAUTO);
+                }else if(LIGHTOPENORCLOSE == CaptureRequest.FLASH_MODE_SINGLE) {
+                    LIGHTOPENORCLOSE = CaptureRequest.FLASH_MODE_OFF;
+                    messageHandler.sendEmptyMessage(LIGHTCLOSE);
+                }
                 break;
             case R.id.btn_startrecord:
                 if (isStartRecord) {
@@ -630,11 +701,28 @@ public class CameraActivity extends Activity implements View.OnClickListener {
 
         //获取最小的焦距值
         minimumLens = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+        //传感器的信息
+
+        integerRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+        Integer integer1 = characteristics.get(CameraCharacteristics.SENSOR_MAX_ANALOG_SENSITIVITY);
+
+        Log.d(TAG, "initCamera: SENSOR_MAX_ANALOG_SENSITIVITY " + integer1);
+        if(integerRange != null) {
+            //获取最大最小值
+            maxISO = integerRange.getUpper();
+            minISO = integerRange.getLower();
+            Log.d(TAG, "initCamera: minimumLens :" +minimumLens + " maxISO: " + maxISO + " minISO: " + minISO + " range: " + integerRange.toString());
+        }
+
+
+
 
 
         Log.d(TAG, "initCamera: " + minimumLens + " ca " );
+
         map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
         Integer integer = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+        Toast.makeText(CameraActivity.this, ""+ integer.toString(), Toast.LENGTH_SHORT).show();
         Log.d(TAG, "initCamera: " + integer.toString());
         Size largest = Collections.max(
                 Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
@@ -642,8 +730,8 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         //设置最大的图像尺寸
         imageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(), ImageFormat.JPEG, 50);
         imageReader.setOnImageAvailableListener(new MyOnImageAvailableListener(), mainHandler);
-        imageReaderTakePictures = ImageReader.newInstance(1080, 1920, ImageFormat.JPEG, 50);
-        imageReaderTakePictures.setOnImageAvailableListener(new MyPicturesOnImageAvailableListener(), mainHandler);
+        /*imageReaderTakePictures = ImageReader.newInstance(1080, 1920, ImageFormat.JPEG, 50);
+        imageReaderTakePictures.setOnImageAvailableListener(new MyPicturesOnImageAvailableListener(), mainHandler);*/
     }
 
     /**
@@ -966,7 +1054,16 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             takePictureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             //takePictureRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,1);
             // 自动曝光
-            takePictureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+            //takePictureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+            // 自动曝光闪关灯开启或关闭
+            //takePictureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF);
+            takePictureRequestBuilder.set(CaptureRequest.FLASH_MODE, LIGHTOPENORCLOSE);
+
+            //takePictureRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, seekIso);
+            //[9516, 234324552]
+            //takePictureRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, (long) 10000000);
+            //ISO
+            //takePictureRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY,isoValue);
             // 获取手机方向
             int rotation = getWindowManager().getDefaultDisplay().getRotation();
             // 根据设备方向计算设置照片的方向

@@ -1,0 +1,37 @@
+{
+    "logs": [
+        {
+            "outputFile": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\values_values.arsc.flat",
+            "map": [
+                {
+                    "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\values\\values.xml",
+                    "from": {
+                        "startLines": "2,6,7,8,9,10,11,12,13,14",
+                        "startColumns": "4,4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,203,249,294,340,386,430,474,524,577",
+                        "endLines": "5,6,7,8,9,10,11,12,13,17",
+                        "endColumns": "11,45,44,45,45,43,43,49,52,11",
+                        "endOffsets": "198,244,289,335,381,425,469,519,572,729"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\zhangheng1\\.gradle\\caches\\transforms-1\\files-1.1\\rules-0.5.aar\\5507d768e5f91f5c3562add188e095de\\res\\values\\values.xml",
+                    "from": {
+                        "startLines": "4",
+                        "startColumns": "4",
+                        "startOffsets": "229",
+                        "endColumns": "45",
+                        "endOffsets": "270"
+                    },
+                    "to": {
+                        "startLines": "20",
+                        "startColumns": "4",
+                        "startOffsets": "1344",
+                        "endColumns": "45",
+                        "endOffsets": "1385"
+                    }
+                }
+            ]
+        }
+    ]
+}

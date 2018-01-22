@@ -6,22 +6,97 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:id="@+id/ll_title"
         >
-        <TextView
-            android:id="@+id/tv_light"
-            android:gravity="center"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/tv_light"
+                android:gravity="center"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="闪光灯打开"
+
+                android:textColor="@color/black"
+                />
+            <TextView
+                android:id="@+id/tv_cameraID"
+                android:gravity="center"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="切换摄像头"
+
+                android:textColor="@color/black"
+                />
+
+            <EditText
+                android:id="@+id/et_cameraID"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="phone" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_opencameraTime"
+                android:layout_weight="1"
+                android:text="打开相机"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_setcamera"
             android:layout_weight="1"
-            android:text="闪光灯打开"
-            android:textSize="20sp"
-            android:textColor="@color/black"
-            />
+            android:text="设置相机参数的时间"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_openTostartpreTime"
+                android:layout_weight="1"
+                android:text="打开相机之后到开始预览"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_shut"
+            android:layout_weight="1"
+            android:text="点拍照到快门响应时间"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_clickTodataReadyTime"
+            android:layout_weight="1"
+            android:text="点击拍照到数据完成"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_dateTostartTime"
+            android:layout_weight="1"
+            android:text="数据准备好后到重新开始预览"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+        android:id="@+id/tv_stopPre"
+        android:layout_weight="1"
+        android:text="结束预览的时间"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+        <TextView
+            android:id="@+id/tv_closeCamera"
+            android:layout_weight="1"
+            android:text="关闭相机的时间"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
 
 
     </LinearLayout>
+
     <SurfaceView
         android:id="@+id/surface_view_camera2_activity"
         android:layout_width="match_parent"
@@ -35,6 +110,30 @@
         android:layout_height="50dp"
         android:layout_alignParentBottom="true"
         android:layout_centerInParent="true"/>
+    <Button
+        android:text="结束预览"
+        android:id="@+id/btn_stopPre"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"/>
+    <Button
+        android:text="关闭相机"
+        android:id="@+id/btn_closeCamera"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toRightOf="@+id/btn_stopPre"
+        android:layout_alignParentBottom="true"
+        android:layout_toLeftOf="@+id/ib_takephoto"/>
+    <Button
+        android:text="自动测试"
+        android:id="@+id/btn_autotest"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_toRightOf="@+id/ib_takephoto"
+        android:layout_alignParentBottom="true"
+        />
+
     <ImageView
         android:id="@+id/iv_photes"
 

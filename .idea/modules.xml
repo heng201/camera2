@@ -4,8 +4,13 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/MyCamera.iml" filepath="$PROJECT_DIR$/MyCamera.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/camera1andcamera2/camera1andcamera2.iml" filepath="$PROJECT_DIR$/camera1andcamera2/camera1andcamera2.iml" />
       <module fileurl="file://$PROJECT_DIR$/camera1app/camera1app.iml" filepath="$PROJECT_DIR$/camera1app/camera1app.iml" />
       <module fileurl="file://$PROJECT_DIR$/camera2app/camera2app.iml" filepath="$PROJECT_DIR$/camera2app/camera2app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/filter/filter.iml" filepath="$PROJECT_DIR$/filter/filter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/glsurfaceview/glsurfaceview.iml" filepath="$PROJECT_DIR$/glsurfaceview/glsurfaceview.iml" />
+      <module fileurl="file://$PROJECT_DIR$/magicfilter/magicfilter.iml" filepath="$PROJECT_DIR$/magicfilter/magicfilter.iml" />
+      <module fileurl="file://$PROJECT_DIR$/myfilter/myfilter.iml" filepath="$PROJECT_DIR$/myfilter/myfilter.iml" />
       <module fileurl="file://$PROJECT_DIR$/radio/radio.iml" filepath="$PROJECT_DIR$/radio/radio.iml" />
     </modules>
   </component>

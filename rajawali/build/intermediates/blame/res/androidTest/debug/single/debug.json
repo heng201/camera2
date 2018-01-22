@@ -1,0 +1,54 @@
+[
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_sepia_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\sepia_fragment_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_blend_screen_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\blend_screen_fragment_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_copy_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\copy_fragment_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_scanline_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\scanline_fragment_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_fxaa_vertex_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\fxaa_vertex_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_fog_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\fog_fragment_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_vignette_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\vignette_fragment_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_blur_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\blur_fragment_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_blend_add_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\blend_add_fragment_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_color_threshold_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\color_threshold_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_minimal_vertex_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\minimal_vertex_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_grey_scale_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\grey_scale_fragment_shader.glsl"
+    },
+    {
+        "merged": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\res\\merged\\androidTest\\debug\\raw_fxaa_fragment_shader.glsl.flat",
+        "source": "D:\\download\\ARCamera-master\\rajawali\\build\\intermediates\\bundles\\debug\\res\\raw\\fxaa_fragment_shader.glsl"
+    }
+]

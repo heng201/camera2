@@ -83,10 +83,10 @@ public class FocusFrameView extends View
         mpaint.setColor(mcolorfill);
         mpaint.setStyle(Paint.Style.FILL);
         mpaint.setStrokeWidth(2.0f);
-        canvas.drawLine(mCenterX -mwidth / 2 , mCenterY -mheight/ 2 , mCenterX + mwidth/2, mCenterY -mheight/ 2, mpaint);
-        canvas.drawLine(mCenterX +mwidth/2, mCenterY -mheight/ 2, mCenterX +mwidth/2, mCenterY +mheight/2, mpaint);
-        canvas.drawLine(mCenterX +mwidth/2, mCenterY +mheight/2, mCenterX - mwidth/2, mCenterY +mheight/2, mpaint);
-        canvas.drawLine(mCenterX - mwidth/2, mCenterY +mheight/2, mCenterX -mwidth/2, mCenterY -mheight/2, mpaint);
+        canvas.drawLine(mCenterX -mwidth / 2 , mCenterY -mheight/ 2+200 , mCenterX + mwidth/2, mCenterY -mheight/ 2+200, mpaint);
+        canvas.drawLine(mCenterX +mwidth/2, mCenterY -mheight/ 2+200, mCenterX +mwidth/2, mCenterY +mheight/2+200, mpaint);
+        canvas.drawLine(mCenterX +mwidth/2, mCenterY +mheight/2+200, mCenterX - mwidth/2, mCenterY +mheight/2+200, mpaint);
+        canvas.drawLine(mCenterX - mwidth/2, mCenterY +mheight/2+200, mCenterX -mwidth/2, mCenterY -mheight/2+200, mpaint);
         super.onDraw(canvas);
     }
 
