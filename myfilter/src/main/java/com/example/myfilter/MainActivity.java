@@ -8,6 +8,7 @@ import android.hardware.Camera;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.opengl.GLUtils;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
@@ -15,13 +16,12 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
-import com.example.myfilter.GLtexture.GLBitmapTexture;
-import com.example.myfilter.GLtexture.GLES20Utils;
 import com.example.myfilter.GLtexture.GLTexture;
 import com.example.myfilter.filter.DipianDrawer;
 import com.example.myfilter.filter.ErzhiDrawer;
 import com.example.myfilter.filter.FansheDrawer;
 import com.example.myfilter.filter.FugueDrawer;
+import com.example.myfilter.filter.HeibaiDrawer;
 import com.example.myfilter.filter.JiaopianDrawer;
 import com.example.myfilter.filter.JiuhongDrawer;
 import com.example.myfilter.filter.LangmanDrawer;
@@ -30,6 +30,7 @@ import com.example.myfilter.filter.FendaiDrawer;
 import com.example.myfilter.filter.TestSaveDrawer;
 import com.example.myfilter.filter.YueguangDrawer;
 import com.example.myfilter.utils.CameraEngine;
+import com.example.myfilter.utils.CameraUtils;
 import com.example.myfilter.utils.DirectDrawer;
 import com.example.myfilter.utils.FilterTool;
 import com.example.myfilter.utils.HeibaiDraw;
@@ -71,7 +72,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
     private JiaopianDrawer jiaopianDrawer;
     private Button btn_yueguang;
     private YueguangDrawer yueguangDrawer;
-    private HeibaiDraw heibaiDraw;
+    private HeibaiDrawer heibaiDrawer;
     private FansheDrawer fansheDrawer;
     private ErzhiDrawer erzhiDrawer;
     private FugueDrawer fugueDrawer;
@@ -81,13 +82,14 @@ public class MainActivity extends Activity implements View.OnClickListener {
     private QingningDrawer qingningDrawer;
     private FendaiDrawer fendaiDrawer;
     private TestSaveDrawer testSaveDrawer;
+    private HeibaiDraw heibaiDraw;
     private int lvjingID = 0;
     private Bitmap testBitmap;
     /**
      * 从照片到texture
      */
     private GLTexture textureFromBitmap;
-    private int textureID;
+
     /**
      * 拍照的照片
      *
@@ -101,6 +103,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         //初始化
         glsv_glsurfaceview = findViewById(R.id.glsv_glsurfaceview);
         glsv_glsurfaceview.setEGLContextClientVersion(2);
+
 
         glsv_glsurfaceview.setRenderer(new MyRender());
         glsv_glsurfaceview.setRenderMode(RENDERMODE_WHEN_DIRTY);
@@ -180,6 +183,44 @@ public class MainActivity extends Activity implements View.OnClickListener {
         }
     }
 
+    public void sendImage(int width, int height) {
+        ByteBuffer rgbaBuf = mBuffer;
+        rgbaBuf.position(0);
+        long start = System.nanoTime();
+        GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE,
+                rgbaBuf);
+        long end = System.nanoTime();
+        Log.d("TryOpenGL", "glReadPixels: " + (end - start));
+        saveRgb2Bitmap(rgbaBuf, Environment.getExternalStorageDirectory().getAbsolutePath()
+                + "/gl_dump_" + width + "_" + height + ".png", width, height);
+    }
+
+    private void saveRgb2Bitmap(Buffer buf, String filename, int width, int height) {
+        Log.d("TryOpenGL", "Creating " + filename);
+        BufferedOutputStream bos = null;
+        try {
+            bos = new BufferedOutputStream(new FileOutputStream(filename));
+            Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            bmp.copyPixelsFromBuffer(buf);
+            bmp.compress(Bitmap.CompressFormat.PNG, 90, bos);
+//            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssmm").format(new Date());
+//            String bitmapPath = "/sdcard/" + timeStamp + ".png";
+//            Log.e("path", bitmapPath);
+//            new saveBitmap(bitmapPath, bmp).start();
+
+            bmp.recycle();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (bos != null) {
+                try {
+                    bos.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
     /**
      * 单拍的照片获取
      */
@@ -188,6 +229,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
         @Override
         public void onPictureTaken(byte[] bytes, Camera camera) {
             camera.startPreview();
+
+            //sendImage(800,1000);
             long startTime=System.currentTimeMillis();   //获取开始时间
             bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
             if (bitmap != null) {
@@ -363,7 +406,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
             surfaceTexture.setOnFrameAvailableListener(new MyOnFrameAvailableListener());
             directDrawer = new DirectDrawer(texttureID);
-            heibaiDraw = new HeibaiDraw(texttureID);
+            heibaiDrawer = new HeibaiDrawer(texttureID);
             fansheDrawer = new FansheDrawer(texttureID);
             erzhiDrawer = new ErzhiDrawer(texttureID);
             fugueDrawer = new FugueDrawer(texttureID);
@@ -375,6 +418,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
             jiaopianDrawer = new JiaopianDrawer(MainActivity.this,texttureID);
             yueguangDrawer = new YueguangDrawer(MainActivity.this,texttureID);
             testSaveDrawer = new TestSaveDrawer(MainActivity.this,texttureID);
+            heibaiDraw = new HeibaiDraw(MainActivity.this,texttureID);
 
             if(CameraEngine.openCamera()) {
                 mCamera = CameraEngine.getCamera();
@@ -403,9 +447,47 @@ public class MainActivity extends Activity implements View.OnClickListener {
             if(lvjingID == 0) {
                 directDrawer.draw(mtx);
             }else if(lvjingID == 1) {
-                heibaiDraw.draw(mtx);
+                heibaiDrawer.draw(mtx);
             }else if(lvjingID == 2) {
-                fansheDrawer.draw(mtx);
+                if(!isInit) {
+                    Log.d("mysurfaceTexture", "render: surfaceTexture null");
+                    createEnvi();
+                    isInit = true;
+                }/*
+                initSurfaceTexture();
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fFrame[0]);
+                GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, GLES20.GL_TEXTURE_2D, fTexture[0], 0);
+                //GLES20.glFramebufferRenderbuffer(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT, GLES20.GL_RENDERBUFFER, fRender[0]);
+                //GLES20.glViewport(0, 0, 800, 1000);*/
+
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fFrame[0]);
+                GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0,
+                        GLES20.GL_TEXTURE_2D, fTexture[0], 0);
+                GLES20.glFramebufferRenderbuffer(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT,
+                        GLES20.GL_RENDERBUFFER, fRender[0]);
+                int i = GLES20.GL_FRAMEBUFFER_COMPLETE;
+                if(GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) == i) {
+                    Log.d(TAG, "glCheckFramebufferStatus: success");
+                }else {
+                    Log.d(TAG, "glCheckFramebufferStatus: lose");
+                }
+
+                //GLES20.glFramebufferRenderbuffer(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT, GLES20.GL_RENDERBUFFER, fRender[0]);
+                //GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
+                heibaiDrawer.draw(mtx);
+                //surfaceTexture.attachToGLContext();
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+                //GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER,0);
+                //GLES20.glReadPixels(0, 0, 800, 1000, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, mBuffer);
+                //GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
+                //heibaiDraw.setByteBuffer(mBuffer);
+                GLES20.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+                //GLES20.glViewport(-300,-300,glsv_glsurfaceview.getWidth(),glsv_glsurfaceview.getHeight());
+                heibaiDraw.setTexture(texttureID);
+                heibaiDraw.draw(mtx);
+                //GLES20.glViewport(0,0,glsv_glsurfaceview.getWidth(),glsv_glsurfaceview.getHeight());
+                //GLES20.glFramebufferRenderbuffer(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT, GLES20.GL_RENDERBUFFER, 0);
             }else if(lvjingID == 3) {
                 erzhiDrawer.draw(mtx);
             }else if(lvjingID == 4) {
@@ -424,20 +506,113 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 jiaopianDrawer.draw(mtx);
             }else if(lvjingID == 11) {
                 //yueguangDrawer.draw(mtx);
+                final long startTime=System.currentTimeMillis();   //获取开始时间
                 testSaveDrawer.draw(testBitmap);
-                long startTime=System.currentTimeMillis();   //获取开始时间
+
                 if(bool && lvjingID == 11) {
-                    testSaveDrawer.sendImage(800,1000);
+                    testSaveDrawer.sendImage(1080,1920);
                     bool = false;
-                    long endTime=System.currentTimeMillis(); //获取结束时间
+                    final long endTime=System.currentTimeMillis(); //获取结束时间
                     System.out.println("程序运行时间： "+(endTime-startTime)+"ms");
-                    //Toast.makeText(MainActivity.this, ""+(endTime-startTime), Toast.LENGTH_SHORT).show();
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(MainActivity.this, ""+(endTime-startTime), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+
                 }
             }
 
         }
     }
 
+
+    private int[] fFrame = new int[1];
+    private int[] fRender = new int[1];
+    private int[] fTexture = new int[1];
+    private boolean isInit = false;
+    private ByteBuffer mBuffer;
+    private SurfaceTexture mySurfaceTexture;
+    public void createEnvi() {
+        Log.d(TAG, "createEnvi: width" + CameraUtils.getLargePreviewSize(mCamera).width+ "height"+CameraUtils.getLargePreviewSize(mCamera).height);
+        GLES20.glGenFramebuffers(1, fFrame, 0);
+        GLES20.glGenRenderbuffers(1, fRender, 0);
+        GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, fRender[0]);
+        GLES20.glRenderbufferStorage(GLES20.GL_RENDERBUFFER, GLES20.GL_DEPTH_COMPONENT16, glsv_glsurfaceview.getWidth(),
+                glsv_glsurfaceview.getHeight());
+        GLES20.glFramebufferRenderbuffer(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT,
+                GLES20.GL_RENDERBUFFER, fRender[0]);
+        GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, 0);
+        GLES20.glGenTextures(1, fTexture, 0);
+
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fTexture[0]);
+
+
+           GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, glsv_glsurfaceview.getWidth(), glsv_glsurfaceview.getHeight(),
+                        0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null);
+            GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST);
+            GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+            GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+            GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+
+        //mBuffer = ByteBuffer.allocate(CameraUtils.getLargePreviewSize(mCamera).height*CameraUtils.getLargePreviewSize(mCamera).width * 4);
+    }
+    private void initSurfaceTexture() {
+
+        //创建texture
+        GLES20.glGenTextures(1, fTexture, 0);
+        //将此纹理绑定到外部纹理上
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, fTexture[0]);
+        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, 800, 1000,
+                0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null);
+
+     //设置缩小过滤为使用纹理中坐标最接近的一个像素的颜色作为需要绘制的像素颜色
+        GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR_MIPMAP_LINEAR/*GLES20.GL_NEAREST*/);
+     //设置放大过滤为使用纹理中坐标最接近的若干个颜色，通过加权平均算法得到需要绘制的像素颜色
+        GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR);
+    //设置环绕方向S，截取纹理坐标到[1/2n,1-1/2n]。将导致永远不会与border融合
+        GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE);
+     //设置环绕方向T，截取纹理坐标到[1/2n,1-1/2n]。将导致永远不会与border融合
+        GLES20.glTexParameterf(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE);
+
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+        //创建frame
+        GLES20.glGenFramebuffers(1, fFrame, 0);
+        GLES20.glGenRenderbuffers(1, fRender, 0);
+        GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, fRender[0]);
+        GLES20.glRenderbufferStorage(GLES20.GL_RENDERBUFFER, GLES20.GL_DEPTH_COMPONENT16,800,1000);
+                /*CameraUtils.getLargePreviewSize(mCamera).width, CameraUtils.getLargePreviewSize(mCamera).height*/
+        GLES20.glFramebufferRenderbuffer(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT,
+                GLES20.GL_RENDERBUFFER, fRender[0]);
+        //GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, 0);
+        //mySurfaceTexture = new SurfaceTexture(fTexture[0]);
+        Log.d(TAG, "initSurfaceTexture: " + fTexture[0]);
+        //mBuffer = ByteBuffer.allocate(800 * 1000 * 4);
+        //fansheDrawer.setTexture(fTexture[0]);
+
+//        //绑定FrameBuffer
+//        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fFrame[0]);
+//        //为FrameBuffer挂载Texture[0]来存储颜色
+//        GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0,
+//                GLES20.GL_TEXTURE_2D, fTexture[0], 0);
+//        //surfaceTexture = new SurfaceTexture(fTexture[0]);
+        //mBuffer = ByteBuffer.allocate(texture.getTextureWidth() * texture.getTextureHeight() * 4);
+//        //绑定texture
+//        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fFrame[0]);
+//        GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0,
+//                GLES20.GL_TEXTURE_2D, texture.getTextureID(), 0);
+//        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+//        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+
+
+        //绑定FrameBuffer后的绘制会绘制到textures[1]上了
+
+        //解绑FrameBuffer
+        //GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER,0);
+
+
+    }
 
     private Boolean bool = true;
     class MyOnFrameAvailableListener implements SurfaceTexture.OnFrameAvailableListener {

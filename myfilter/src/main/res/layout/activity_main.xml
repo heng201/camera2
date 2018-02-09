@@ -6,6 +6,7 @@
     android:orientation="vertical"
     tools:context="com.example.myfilter.MainActivity">
 
+
     <android.opengl.GLSurfaceView
         android:id="@+id/glsv_glsurfaceview"
         android:layout_width="match_parent"

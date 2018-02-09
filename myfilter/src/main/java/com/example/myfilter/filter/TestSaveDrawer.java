@@ -119,13 +119,12 @@ public class TestSaveDrawer {
     public void sendImage(int width, int height) {
         ByteBuffer rgbaBuf = ByteBuffer.allocateDirect(width * height * 4);
         rgbaBuf.position(0);
-        long start = System.nanoTime();
-        GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE,
-                rgbaBuf);
-        long end = System.nanoTime();
+        long start = System.currentTimeMillis();
+        GLES20.glReadPixels(0, 0, width, height, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, rgbaBuf);
+        long end = System.currentTimeMillis();
         Log.d("TryOpenGL", "glReadPixels: " + (end - start));
         saveRgb2Bitmap(rgbaBuf, Environment.getExternalStorageDirectory().getAbsolutePath()
-                + "/gl_dump_" + width + "_" + height + ".png", width, height);
+                + "/gl_dump_" + width + "_" + height + ".jpg", width, height);
     }
 
     private void saveRgb2Bitmap(Buffer buf, String filename, int width, int height) {
@@ -134,8 +133,13 @@ public class TestSaveDrawer {
         try {
             bos = new BufferedOutputStream(new FileOutputStream(filename));
             Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            long time = System.currentTimeMillis();
             bmp.copyPixelsFromBuffer(buf);
-            bmp.compress(Bitmap.CompressFormat.PNG, 90, bos);
+            long time1= System.currentTimeMillis();
+            Log.d("copyPixelsFromBuffer", "saveRgb2Bitmap: "+ (time1 - time));
+            bmp.compress(Bitmap.CompressFormat.JPEG, 90, bos);
+            long time2 = System.currentTimeMillis();
+            Log.d("compress", "saveRgb2Bitmap: " + (time2 - time1));
             bmp.recycle();
         } catch (IOException e) {
             e.printStackTrace();
@@ -169,7 +173,7 @@ public class TestSaveDrawer {
         GLES20.glUniform1i(mGLUniformTexture,3);
 
         mGLUniformTexture1 = GLES20.glGetUniformLocation(mProgram, "mybitmap");
-        inputTextureHandles1 = OpenGlUtils.loadTexture(context, "filter/test.jpg");
+        inputTextureHandles1 = OpenGlUtils.loadTexture(context, "filter/test1.jpg");
         //filtertable_rgb_second_sunny，filtertable_rgb_second_ink，filtertable_rgb_mono，lut3d_table_moonlight
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0 +4);

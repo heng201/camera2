@@ -95,6 +95,10 @@ public class FansheDrawer {
         GLES20.glLinkProgram(mProgram);                  // creates OpenGL ES program executables
     }
 
+    public void setTexture(int texture) {
+        this.texture = texture;
+    }
+
     public void draw(float[] mtx)
     {
         GLES20.glUseProgram(mProgram);

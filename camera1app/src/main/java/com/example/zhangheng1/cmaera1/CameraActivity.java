@@ -902,6 +902,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     private void takepicture() {
         startTime=System.currentTimeMillis();   //获取开始时间
 
+        //其中第一个参数是按下快门的回调，第二个参数是原始图片的回调，第三个参数是经压缩处理后比较小的jpeg图片的回调。
         camera.takePicture(new MyShutterCallback(), null, new MyPictureCallback());
     }
 

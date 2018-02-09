@@ -10,9 +10,8 @@
         android:id="@+id/ll_title">
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="100px"
+            android:layout_height="wrap_content"
             android:orientation="horizontal"
-
             >
             <TextView
                 android:id="@+id/tv_light"
@@ -21,47 +20,149 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="闪光灯关闭"
-                android:textSize="20sp"
+                android:textSize="15sp"
                 android:textColor="@color/black"
                 />
-
-
-        </LinearLayout>
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <SeekBar
-                android:id="@+id/sb_focusdistant"
-                android:layout_width="match_parent"
+            <TextView
+                android:background="@color/black"
+                android:layout_width="1dp"
+                android:layout_height="match_parent" />
+            <TextView
+                android:id="@+id/tv_focus"
+                android:gravity="center"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-               />
+                android:text="对焦"
+                android:textSize="15sp"
+                android:textColor="@color/black"
+                />
+            <TextView
+                android:background="@color/black"
+                android:layout_width="1dp"
+                android:layout_height="match_parent" />
+            <TextView
+                android:id="@+id/tv_iso"
+                android:gravity="center"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="ISO"
+                android:textSize="15sp"
+                android:textColor="@color/black"
+                />
+            <TextView
+                android:background="@color/black"
+                android:layout_width="1dp"
+                android:layout_height="match_parent" />
+            <TextView
+                android:id="@+id/tv_awb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="AWB"
+                android:textColor="@color/black"
+                android:textSize="15sp" />
+            <TextView
+                android:background="@color/black"
+                android:layout_width="1dp"
+                android:layout_height="match_parent" />
+            <TextView
+                android:id="@+id/tv_effect"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="滤镜"
+                android:textColor="@color/black"
+                android:textSize="15sp" />
+            <TextView
+                android:background="@color/black"
+                android:layout_width="1dp"
+                android:layout_height="match_parent" />
+            <TextView
+                android:id="@+id/tv_scale"
+                android:gravity="center"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="缩放"
+                android:textSize="15sp"
+                android:textColor="@color/black"
+                />
+            <TextView
+                android:background="@color/black"
+                android:layout_width="1dp"
+                android:layout_height="match_parent" />
+            <TextView
+                android:id="@+id/tv_ae"
+                android:gravity="center"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="曝光补偿"
+                android:textSize="15sp"
+                android:textColor="@color/black"
+                />
 
             <TextView
-                android:textColor="@color/black"
-                android:layout_width="40dp"
+                android:background="@color/black"
+                android:layout_width="1dp"
+                android:layout_height="match_parent" />
+            <TextView
+                android:id="@+id/tv_time"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="焦距"
-                />
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="曝光时间"
+                android:textColor="@color/black"
+                android:textSize="15sp" />
+
+
+
         </LinearLayout>
-        <LinearLayout
+        <TextView
+            android:background="@color/black"
+            android:layout_width="match_parent"
+            android:layout_height="1dp" />
+        <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+           >
             <SeekBar
-                android:id="@+id/sb_isosetting"
+                android:id="@+id/sb_focus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"/>
-            <TextView
-                android:textColor="@color/black"
-                android:layout_width="40dp"
-                android:layout_height="wrap_content"
-                android:text="ISO"
+               />
 
+            <SeekBar
+                android:id="@+id/sb_iso"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 />
-        </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/sb_scale"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                />
+
+            <SeekBar
+                android:id="@+id/sb_ae"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                />
+            <SeekBar
+                android:id="@+id/sb_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                />
+        </RelativeLayout>
+
+
+
 
 
     </LinearLayout>
@@ -72,6 +173,14 @@
         android:layout_height="match_parent"
         android:layout_below="@+id/ll_title"/>
 
+    <TextView
+        android:id="@+id/tv_messagetoast"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true"
+        android:textSize="25sp"
+        android:textColor="@color/white"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
     <Button
         android:id="@+id/btn_takephoto"
         android:background="@drawable/ic_launcher_camera"

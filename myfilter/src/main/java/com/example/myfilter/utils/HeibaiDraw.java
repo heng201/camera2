@@ -1,5 +1,6 @@
 package com.example.myfilter.utils;
 
+import android.content.Context;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
@@ -23,6 +24,7 @@ import java.nio.ShortBuffer;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
+import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -42,12 +44,13 @@ import java.nio.ShortBuffer;
         private  String fragmentShaderCode =
                 "#extension GL_OES_EGL_image_external : require\n" +
                         "precision mediump float;" +
+                        "uniform sampler2D lut_tab;\n" +
                         "varying vec2 textureCoordinate;\n" +
-                        "uniform samplerExternalOES s_texture;\n" +
+                        //"uniform samplerExternalOES s_texture;\n" +
                         "void main() {" +
-                        "vec4 temColor = texture2D( s_texture, textureCoordinate );\n"+
+                        "vec4 temColor = texture2D( lut_tab, textureCoordinate );\n"+
                         "float max = (temColor.r + temColor.g + temColor.b)/3.0;\n"+
-                        "  gl_FragColor = vec4(max,max,max,temColor.w);\n" +
+                        "  gl_FragColor = temColor;\n" +//vec4(max,max,max,temColor.w)
                         "}";
 
         private FloatBuffer vertexBuffer, textureVerticesBuffer;
@@ -64,23 +67,53 @@ import java.nio.ShortBuffer;
         private final int vertexStride = COORDS_PER_VERTEX * 4; // 4 bytes per vertex
 
         static float squareCoords[] = {
+
+
+// /
+//                1.0f,  1.0f,
+//                -1.0f,  1.0f,
+//                -1.0f, -1.0f,
+//                1.0f, -1.0f,
                 -1.0f,  1.0f,
                 -1.0f, -1.0f,
                 1.0f, -1.0f,
                 1.0f,  1.0f,
+
         };
 
+
         static float textureVertices[] = {
+
+
                 0.0f, 1.0f,
-                1.0f, 1.0f,
-                1.0f, 0.0f,
                 0.0f, 0.0f,
+                1.0f, 0.0f,
+                1.0f, 1.0f,
+
+//                0.0f, 1.0f,
+//                1.0f, 1.0f,
+//                1.0f, 0.0f,
+//                0.0f, 0.0f,
+
+
         };
 
         private int texture;
+        private int texture1;
+        private Context context;
+        private ByteBuffer byteBuffer;
 
-        public HeibaiDraw(int texture)
+        public void setByteBuffer(ByteBuffer byteBuffer) {
+            this.byteBuffer = byteBuffer;
+        }
+
+        public void setTexture(int texture) {
+            this.texture1 = texture;
+        }
+
+        public HeibaiDraw(Context context,int texture)
         {
+            this.context = context;
             this.texture = texture;
             // initialize vertex byte buffer for shape coordinates
             ByteBuffer bb = ByteBuffer.allocateDirect(squareCoords.length * 4);
@@ -111,25 +144,34 @@ import java.nio.ShortBuffer;
             GLES20.glLinkProgram(mProgram);                  // creates OpenGL ES program executables
         }
 
+        private int mGLUniformTexture;
+        private int inputTextureHandles = -1;
         public void draw(float[] mtx)
         {
             GLES20.glUseProgram(mProgram);
 
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texture);
+//            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+//            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texture);
 
+            mGLUniformTexture = GLES20.glGetUniformLocation(mProgram, "lut_tab");
+            //inputTextureHandles = OpenGlUtils.loadTexture(context, "filter/test.jpg");
+            //inputTextureHandles = OpenGlUtils.loadTexturefromBuffer(byteBuffer,800,1000,inputTextureHandles);
+
+            Log.d("draw: ", "draw: "+ inputTextureHandles);
+            //filtertable_rgb_second_sunny，filtertable_rgb_second_ink，filtertable_rgb_mono，lut3d_table_moonlight
+
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0 );
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texture1);
+            Log.d("draw: ", "draw: "+ texture1);
+            GLES20.glUniform1i(mGLUniformTexture,0);
             // get handle to vertex shader's vPosition member
             mPositionHandle = GLES20.glGetAttribLocation(mProgram, "vPosition");
-
             // Enable a handle to the triangle vertices
             GLES20.glEnableVertexAttribArray(mPositionHandle);
-
             // Prepare the <insert shape here> coordinate data
             GLES20.glVertexAttribPointer(mPositionHandle, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false, vertexStride, vertexBuffer);
-
             mTextureCoordHandle = GLES20.glGetAttribLocation(mProgram, "inputTextureCoordinate");
             GLES20.glEnableVertexAttribArray(mTextureCoordHandle);
-
 //        textureVerticesBuffer.clear();
 //        textureVerticesBuffer.put( transformTextureCoordinates( textureVertices, mtx ));
 //        textureVerticesBuffer.position(0);

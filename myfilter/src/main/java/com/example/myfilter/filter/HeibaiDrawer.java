@@ -123,6 +123,7 @@ public class HeibaiDrawer {
 
         GLES20.glDrawElements(GLES20.GL_TRIANGLES, drawOrder.length, GLES20.GL_UNSIGNED_SHORT, drawListBuffer);
 
+        //GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         // Disable vertex array
         GLES20.glDisableVertexAttribArray(mPositionHandle);
         GLES20.glDisableVertexAttribArray(mTextureCoordHandle);
