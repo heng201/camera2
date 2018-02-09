@@ -119,6 +119,19 @@
                 android:text="曝光时间"
                 android:textColor="@color/black"
                 android:textSize="15sp" />
+            <TextView
+                android:background="@color/black"
+                android:layout_width="1dp"
+                android:layout_height="match_parent" />
+            <TextView
+                android:id="@+id/tv_scene"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="传感器"
+                android:textColor="@color/black"
+                android:textSize="15sp" />
 
 
 

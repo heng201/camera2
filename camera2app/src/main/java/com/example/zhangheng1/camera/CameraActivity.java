@@ -57,8 +57,10 @@ import android.widget.Toast;
 
 import com.example.zhangheng1.camera.adapter.EffectAdapter;
 import com.example.zhangheng1.camera.adapter.AwbAdapter;
+import com.example.zhangheng1.camera.adapter.SenseAdapter;
 import com.example.zhangheng1.camera.listener.EffectItemClickListener;
 import com.example.zhangheng1.camera.listener.AwbItemClickListener;
+import com.example.zhangheng1.camera.listener.SenseItemClickListener;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -104,6 +106,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     private TextView tv_awb;
     private TextView tv_effect;
     private TextView tv_messagetoast;
+    private TextView tv_scene;
 
     private SeekBar sb_focus;
     private SeekBar sb_iso;
@@ -258,6 +261,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         tv_awb = findViewById(R.id.tv_awb);
         tv_effect = findViewById(R.id.tv_effect);
         tv_messagetoast = findViewById(R.id.tv_messagetoast);
+        tv_scene = findViewById(R.id.tv_scene);
 
         btn_startrecord = findViewById(R.id.btn_startrecord);
 
@@ -288,6 +292,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         tv_time.setOnClickListener(this);
         tv_awb.setOnClickListener(this);
         tv_effect.setOnClickListener(this);
+        tv_scene.setOnClickListener(this);
 
         MyOnSeekBarChangeListener myOnSeekBarChangeListener = new MyOnSeekBarChangeListener();
         sb_focus.setOnSeekBarChangeListener(myOnSeekBarChangeListener);
@@ -762,6 +767,17 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                 window.update();
                 window.showAsDropDown(tv_effect, -xoff, 0);
                 break;
+            case R.id.tv_scene:
+                ListView lv1 = new ListView(this);
+                lv1.setBackgroundColor(Color.parseColor("#808080"));
+                SimpleAdapter listItemAdapter1 = SenseAdapter.getAdapter(this);
+                lv1.setAdapter(listItemAdapter1);
+                PopupWindow window1 = createPopupWindow(this, lv1);
+                lv1.setOnItemClickListener(new SenseItemClickListener(previewRequestBuilder, mCameraCaptureSession, handler1, window1, myCaptureCallback));
+                int xoff1 = window1.getWidth() / 2 - tv_scene.getWidth() / 2;
+                window1.update();
+                window1.showAsDropDown(tv_scene, -xoff1, 0);
+                    break;
         }
         updatePreview1();
     }
@@ -1339,6 +1355,8 @@ public class CameraActivity extends Activity implements View.OnClickListener {
      * 将previewBuilder中修改的参数设置到captureBuilder中
      */
     private void previewBuilder2CaptureBuilder() {
+        //HDR等等
+        takePictureRequestBuilder.set(CaptureRequest.CONTROL_MODE, previewRequestBuilder.get(CaptureRequest.CONTROL_MODE));
         //AWB
         takePictureRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, previewRequestBuilder.get(CaptureRequest.CONTROL_AWB_MODE));
         //AE
@@ -1381,7 +1399,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             // 将imageReader的surface作为CaptureRequest.Builder的目标
             takePictureRequestBuilder.addTarget(imageReader.getSurface());
             takePictureRequestBuilder.addTarget(surfaceHolder.getSurface());
-            takePictureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+            //takePictureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
             //设置连续帧
             Range<Integer> fps[] = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
             takePictureRequestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fps[fps.length - 1]);//设置每秒30帧
