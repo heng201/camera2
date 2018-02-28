@@ -11,7 +11,9 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
 import android.graphics.Rect;
+import android.graphics.YuvImage;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -28,6 +30,7 @@ import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.os.AsyncTask;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
@@ -62,10 +65,12 @@ import com.example.zhangheng1.camera.listener.EffectItemClickListener;
 import com.example.zhangheng1.camera.listener.AwbItemClickListener;
 import com.example.zhangheng1.camera.listener.SenseItemClickListener;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -120,9 +125,11 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     private ImageView ivPhotes;
 
     private Handler handler1, handler2, mainHandler;
+    private Handler mBackgroundHandler;
     private CameraDevice mCameraDevice;
     private CaptureRequest.Builder preCameraCaptureRequest;
-    private ImageReader imageReader;
+    private ImageReader imageReaderYUV;
+    private ImageReader imageReaderJPEG;
     private ImageReader imageReaderTakePictures;
     /**
      * 图片的地址
@@ -199,20 +206,24 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     private boolean isSacle = false;
     private boolean isAe = false;
     private boolean isTime = false;
+    private int pictureNum = 1;
+    boolean isSetBuilder = false;
     /**
      * 消失对焦框
      */
-    private static int REFRESHFOCUSVIEW = 0;
-    private static int LIGHTOPEN = 1;
-    private static int LIGHTCLOSE = 2;
-    private static int LIGHTAUTO = 3;
-    private static int CAPTURES = 4;
-    private static int TOASTGONE = 5;
-    private static int LIGHTOPENORCLOSE = CaptureRequest.FLASH_MODE_OFF;
+    private static final int REFRESHFOCUSVIEW = 0;
+    private static final int LIGHTOPEN = 1;
+    private static final int LIGHTCLOSE = 2;
+    private static final int LIGHTAUTO = 3;
+    private static final int CAPTURES = 4;
+    private static final int TOASTGONE = 5;
+    private static  int LIGHTOPENORCLOSE = CaptureRequest.FLASH_MODE_OFF;
     private Handler messageHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
+
+
             if (msg.what == REFRESHFOCUSVIEW) {
                 focusFrameView.setVisibility(View.GONE);
                 //messageHandler.removeMessages(REFRESHFOCUSVIEW);
@@ -224,6 +235,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                 tvLight.setText("闪光灯自动");
             } else if (msg.what == CAPTURES) {
                 mState = STATE_CAPTURE;
+                tv_messagetoast.setVisibility(View.VISIBLE);
             }else if(msg.what == TOASTGONE) {
                 tv_messagetoast.setVisibility(View.GONE);
             }
@@ -235,6 +247,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     private static final int STATE_CAPTURE = 1;
     private static final int STATE_REPRE = 2;
     private int mState = STATE_PREVIEW;
+
 
 
     /**
@@ -319,6 +332,9 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                     break;
                 case MotionEvent.ACTION_UP:
                     mState = STATE_PREVIEW;
+
+                    messageHandler.sendEmptyMessage(TOASTGONE);
+                    pictureNum = 1;
                     messageHandler.removeMessages(CAPTURES);
                     break;
             }
@@ -487,7 +503,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
             //previewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO);
             // 创建CameraCaptureSession，该对象负责管理处理预览请求和拍照请求
-            mCameraDevice.createCaptureSession(Arrays.asList(surfaceHolder.getSurface(), imageReader.getSurface()), new CameraCaptureSession.StateCallback() // ③
+            mCameraDevice.createCaptureSession(Arrays.asList(surfaceHolder.getSurface(), imageReaderYUV.getSurface()), new CameraCaptureSession.StateCallback() // ③
             {
                 @Override
                 public void onConfigured(CameraCaptureSession cameraCaptureSession) {
@@ -646,6 +662,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             case R.id.btn_takephoto:
                 //拍照
                 takePicture();
+                isSetBuilder = false;
                 break;
             case R.id.iv_photes:
                 //进入照片预览
@@ -982,6 +999,9 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         handlerThread1.start();
         handler2 = new Handler(handlerThread1.getLooper());
         mainHandler = new Handler(getMainLooper());
+        HandlerThread mBackgroundThread = new HandlerThread("CameraBackground");
+        mBackgroundThread.start();
+        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
         mCameraID = "" + CameraCharacteristics.LENS_FACING_FRONT;//后摄像头
         //获取摄像头管理
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
@@ -1017,14 +1037,18 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         Integer integer = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
         Toast.makeText(CameraActivity.this, "" + integer.toString(), Toast.LENGTH_SHORT).show();
         Log.d(TAG, "initCamera: " + integer.toString());
+        int[] outputFormats = map.getOutputFormats();
+        for (int i = 0; i < outputFormats.length; i++){
+            Log.d(TAG, "outputFormats: " + outputFormats[i]);
+        }
         Size largest = Collections.max(
                 Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
                 new CompareSizesByArea());
         //设置最大的图像尺寸
-        imageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(), ImageFormat.JPEG, 35);
-        imageReader.setOnImageAvailableListener(new MyOnImageAvailableListener(), mainHandler);
-        /*imageReaderTakePictures = ImageReader.newInstance(1080, 1920, ImageFormat.JPEG, 50);
-        imageReaderTakePictures.setOnImageAvailableListener(new MyPicturesOnImageAvailableListener(), mainHandler);*/
+        imageReaderYUV = ImageReader.newInstance(1920, 1080, ImageFormat.YUV_420_888, 35);
+        imageReaderJPEG = ImageReader.newInstance(largest.getWidth(), largest.getHeight(), ImageFormat.JPEG, 10);
+        imageReaderYUV.setOnImageAvailableListener(new MyOnImageAvailableListener(), mainHandler);
+        imageReaderJPEG.setOnImageAvailableListener(new MyJPEGOnImageAvailableListener(), mainHandler);
     }
 
     /**
@@ -1098,27 +1122,245 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         }
     }
 
+    private static final int COLOR_FormatI420 = 1;
+    private static final int COLOR_FormatNV21 = 2;
 
+    private static boolean isImageFormatSupported(Image image) {
+        int format = image.getFormat();
+        switch (format) {
+            case ImageFormat.YUV_420_888:
+            case ImageFormat.NV21:
+            case ImageFormat.YV12:
+                return true;
+        }
+        return false;
+    }
+
+    private static byte[] getDataFromImage(Image image, int colorFormat) {
+        if (colorFormat != COLOR_FormatI420 && colorFormat != COLOR_FormatNV21) {
+            throw new IllegalArgumentException("only support COLOR_FormatI420 " + "and COLOR_FormatNV21");
+        }
+        if (!isImageFormatSupported(image)) {
+            throw new RuntimeException("can't convert Image to byte array, format " + image.getFormat());
+        }
+        Rect crop = image.getCropRect();
+        int format = image.getFormat();
+        int width = crop.width();
+        int height = crop.height();
+        Image.Plane[] planes = image.getPlanes();
+        byte[] data = new byte[width * height * ImageFormat.getBitsPerPixel(format) / 8];
+        byte[] rowData = new byte[planes[0].getRowStride()];
+        if (false) Log.v(TAG, "get data from " + planes.length + " planes");
+        int channelOffset = 0;
+        int outputStride = 1;
+        for (int i = 0; i < planes.length; i++) {
+            switch (i) {
+                case 0:
+                    channelOffset = 0;
+                    outputStride = 1;
+                    break;
+                case 1:
+                    if (colorFormat == COLOR_FormatI420) {
+                        channelOffset = width * height;
+                        outputStride = 1;
+                    } else if (colorFormat == COLOR_FormatNV21) {
+                        channelOffset = width * height + 1;
+                        outputStride = 2;
+                    }
+                    break;
+                case 2:
+                    if (colorFormat == COLOR_FormatI420) {
+                        channelOffset = (int) (width * height * 1.25);
+                        outputStride = 1;
+                    } else if (colorFormat == COLOR_FormatNV21) {
+                        channelOffset = width * height;
+                        outputStride = 2;
+                    }
+                    break;
+            }
+            ByteBuffer buffer = planes[i].getBuffer();
+            int rowStride = planes[i].getRowStride();
+            int pixelStride = planes[i].getPixelStride();
+            if (false) {
+                Log.v(TAG, "pixelStride " + pixelStride);
+                Log.v(TAG, "rowStride " + rowStride);
+                Log.v(TAG, "width " + width);
+                Log.v(TAG, "height " + height);
+                Log.v(TAG, "buffer size " + buffer.remaining());
+            }
+            int shift = (i == 0) ? 0 : 1;
+            int w = width >> shift;
+            int h = height >> shift;
+            buffer.position(rowStride * (crop.top >> shift) + pixelStride * (crop.left >> shift));
+            for (int row = 0; row < h; row++) {
+                int length;
+                if (pixelStride == 1 && outputStride == 1) {
+                    length = w;
+                    buffer.get(data, channelOffset, length);
+                    channelOffset += length;
+                } else {
+                    length = (w - 1) * pixelStride + 1;
+                    buffer.get(rowData, 0, length);
+                    for (int col = 0; col < w; col++) {
+                        data[channelOffset] = rowData[col * pixelStride];
+                        channelOffset += outputStride;
+                    }
+                }
+                if (row < h - 1) {
+                    buffer.position(buffer.position() + rowStride - length);
+                }
+            }
+            if (false) Log.v(TAG, "Finished reading data from plane " + i);
+        }
+        return data;
+    }
+
+    private static void dumpFile(String fileName, byte[] data) {
+        FileOutputStream outStream;
+        try {
+            outStream = new FileOutputStream(fileName);
+        } catch (IOException ioe) {
+            throw new RuntimeException("Unable to create output file " + fileName, ioe);
+        }
+        try {
+            outStream.write(data);
+            outStream.close();
+        } catch (IOException ioe) {
+            throw new RuntimeException("failed writing data to file " + fileName, ioe);
+        }
+    }
+    private void compressToJpeg(String fileName, Image image) {
+        FileOutputStream outStream;
+        try {
+            outStream = new FileOutputStream(fileName);
+        } catch (IOException ioe) {
+            throw new RuntimeException("Unable to create output file " + fileName, ioe);
+        }
+        Rect rect = image.getCropRect();
+        YuvImage yuvImage = new YuvImage(getDataFromImage(image, COLOR_FormatNV21), ImageFormat.NV21, rect.width(), rect.height(), null);
+        //rotateBitmap(yuvImage,90,rect,fileName);
+        yuvImage.compressToJpeg(rect, 100, outStream);
+
+    }
+    private static void rotateBitmap(YuvImage yuvImage, int orientation, Rect rectangle,String fileName)
+    {
+
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        yuvImage.compressToJpeg(rectangle, 100, os);
+        Matrix matrix = new Matrix();
+        matrix.postRotate(orientation);
+        byte[] bytes = os.toByteArray();
+        Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        bitmap = Bitmap.createBitmap(bitmap, 0, 0,bitmap.getWidth() ,bitmap.getHeight() , matrix, true);
+        FileOutputStream outStream;
+        try {
+            outStream = new FileOutputStream(fileName);
+        } catch (IOException ioe) {
+            throw new RuntimeException("Unable to create output file " + fileName, ioe);
+        }
+        bitmap.compress(Bitmap.CompressFormat.JPEG,100,outStream);
+    }
+    public static byte[] imageToByteArray(Image image) {
+        byte[] data = null;
+        if (image.getFormat() == ImageFormat.JPEG) {
+            Image.Plane[] planes = image.getPlanes();
+            ByteBuffer buffer = planes[0].getBuffer();
+            data = new byte[buffer.capacity()];
+            buffer.get(data);
+            return data;
+        } else if (image.getFormat() == ImageFormat.YUV_420_888) {
+            data = NV21toJPEG(
+                    YUV_420_888toNV21(image),
+                    image.getWidth(), image.getHeight());
+        }
+        return data;
+    }
+
+    private static byte[] rotateYUV420Degree90(byte[] data, int imageWidth, int imageHeight)
+    {
+        byte [] yuv = new byte[imageWidth*imageHeight*3/2];
+        // Rotate the Y luma
+        int i = 0;
+        for(int x = 0;x < imageWidth;x++)
+        {
+            for(int y = imageHeight-1;y >= 0;y--)
+            {
+                yuv[i] = data[y*imageWidth+x];
+                i++;
+            }
+        }
+        // Rotate the U and V color components
+        i = imageWidth*imageHeight*3/2-1;
+        for(int x = imageWidth-1;x > 0;x=x-2)
+        {
+            for(int y = 0;y < imageHeight/2;y++)
+            {
+                yuv[i] = data[(imageWidth*imageHeight)+(y*imageWidth)+x];
+                i--;
+                yuv[i] = data[(imageWidth*imageHeight)+(y*imageWidth)+(x-1)];
+                i--;
+            }
+        }
+        return yuv;
+    }
+
+    private static byte[] YUV_420_888toNV21(Image image) {
+        byte[] nv21;
+        ByteBuffer yBuffer = image.getPlanes()[0].getBuffer();
+        ByteBuffer uBuffer = image.getPlanes()[1].getBuffer();
+        ByteBuffer vBuffer = image.getPlanes()[2].getBuffer();
+
+        int ySize = yBuffer.remaining();
+        int uSize = uBuffer.remaining();
+        int vSize = vBuffer.remaining();
+
+        nv21 = new byte[ySize + uSize + vSize];
+
+        //U and V are swapped
+        yBuffer.get(nv21, 0, ySize);
+        vBuffer.get(nv21, ySize, vSize);
+        uBuffer.get(nv21, ySize + vSize, uSize);
+
+        return nv21;
+    }
+
+    private static byte[] NV21toJPEG(byte[] nv21, int width, int height) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        YuvImage yuv = new YuvImage(nv21, ImageFormat.NV21, width, height, null);
+        yuv.compressToJpeg(new Rect(0, 0, width, height), 100, out);
+        return out.toByteArray();
+    }
     /**
      * 保存图片的线程
      */
-    private class ImageSaver extends Thread {
+    private class JPEGImageSaver implements Runnable {
         /**
          * The JPEG image
          */
-        private final byte[] bytes;
+        private final Image image;
+        private final String filepath;
         /**
          * The file we save the image into.
          */
-        private final String filepath;
-
-        ImageSaver(byte[] bytes, String filepath) {
-            this.bytes = bytes;
+        JPEGImageSaver(Image image, String filepath) {
+            this.image  = image;
             this.filepath = filepath;
         }
-
         @Override
-        public void run() {
+        public void run() {// 定义矩阵对象
+            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+            byte[] bytes = new byte[buffer.remaining()];
+            buffer.get(bytes);//由缓冲区存入字节数组
+            image.close();
+            final Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    ivPhotes.setImageBitmap(bitmap);
+                }
+            });
+
+            picturesPath.add(filepath);
             File mFile = new File(filepath);
             if (!mFile.getParentFile().exists()) {
                 //父目录不存在 创建父目录
@@ -1148,6 +1390,65 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                     }
                 }
             }
+        }
+
+    }
+    /**
+     * 保存图片的线程
+     */
+    private class ImageSaver implements Runnable {
+        /**
+         * The JPEG image
+         */
+        private final Image image;
+        private final String filepath;
+        /**
+         * The file we save the image into.
+         */
+        ImageSaver(Image image, String filepath) {
+           this.image  = image;
+           this.filepath = filepath;
+        }
+        @Override
+        public void run() {// 定义矩阵对象
+//            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+//            byte[] bytes = new byte[buffer.remaining()];
+//            buffer.get(bytes);//由缓冲区存入字节数组
+            Image image1 = this.image;
+            compressToJpeg(filepath,image1);
+            image.close();
+            image1.close();
+//             //   byte[] bytes = imageToByteArray(image);
+            picturesPath.add(filepath);
+//            File mFile = new File(filepath);
+//            if (!mFile.getParentFile().exists()) {
+//                //父目录不存在 创建父目录
+//                Log.d(TAG, "creating parent directory...");
+//                if (!mFile.getParentFile().mkdirs()) {
+//                    Log.e(TAG, "created parent directory failed.");
+//                    //return FLAG_FAILED;
+//                }
+//            }
+//            try {
+//                mFile.createNewFile();
+//            } catch (IOException e) {
+//                Log.d(TAG, "saveBitmap: 保存图片是出错");
+//            }
+//            FileOutputStream output = null;
+//            try {
+//                output = new FileOutputStream(mFile);
+//                output.write(bytes);
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            } finally {
+//                if (null != output) {
+//                    try {
+//                        output.close();
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            }
         }
 
     }
@@ -1187,86 +1488,46 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     /**
      * 图片数据准备好的监听，获取图片
      */
-    class MyPicturesOnImageAvailableListener implements ImageReader.OnImageAvailableListener {
-
-        @Override
-        public void onImageAvailable(ImageReader imageReader) {
-
-            //mCameraDevice.close();
-            //mSurfaceView.setVisibility(View.GONE);
-            // 拿到拍照照片数据
-            Image image = imageReader.acquireNextImage();
-            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-            byte[] bytes = new byte[buffer.remaining()];
-            buffer.get(bytes);//由缓冲区存入字节数组
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-            num++;
-            if (num > 100) {
-                Toast.makeText(CameraActivity.this, "照片够多了", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            Log.d(TAG, "onImageAvailable: saveimage " + num);
-            if (bitmap != null) {
-
-                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssmm").format(new Date());
-                String bitmapPath = "/sdcard/" + timeStamp + num + ".png";
-
-                new ImageSaver(bytes, bitmapPath).start();
-                picturesPath.add(bitmapPath);
-                ivPhotes.setImageBitmap(bitmap);
-                Log.d(TAG, "onImageAvailable: saveimage in " + bitmapPath + num);
-            } else {
-                Log.d(TAG, "onImageAvailable: null");
-            }
-        }
-    }
-
-    /**
-     * 图片数据准备好的监听，获取图片
-     */
     class MyOnImageAvailableListener implements ImageReader.OnImageAvailableListener {
 
         @Override
         public void onImageAvailable(ImageReader imageReader) {
-
-            //mCameraDevice.close();
-            //mSurfaceView.setVisibility(View.GONE);
-            // 拿到拍照照片数据
-            Image image = imageReader.acquireNextImage();
-            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-            byte[] bytes = new byte[buffer.remaining()];
-            buffer.get(bytes);//由缓冲区存入字节数组
-            image.close();
-
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            //Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
             num++;
             if (num > 100) {
                 Toast.makeText(CameraActivity.this, "照片够多了", Toast.LENGTH_SHORT).show();
                 return;
             }
-            Log.d(TAG, "onImageAvailable: saveimage " + num);
-            if (bitmap != null) {
+            //Log.d(TAG, "onImageAvailable: saveimage " + num);
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssSSS").format(new Date());
+            String filepath = "/sdcard/Camera2/" + timeStamp + "_" + num + ".jpg";
+            Log.d(TAG, "onImageAvailable: saveimage in " + filepath + num);
 
-                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssmm").format(new Date());
-                String bitmapPath = "/sdcard/Camera2/" + timeStamp + num + ".jpg";
+            mBackgroundHandler.post(new ImageSaver(imageReader.acquireNextImage(),filepath));
 
-                new ImageSaver(bytes, bitmapPath).start();
-                picturesPath.add(bitmapPath);
-                ivPhotes.setImageBitmap(bitmap);
-//                runOnUiThread(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        ivPhotes.setImageBitmap(bitmap);
-//                    }
-//                });
-
-                Log.d(TAG, "onImageAvailable: saveimage in " + bitmapPath + num);
-            } else {
-                Log.d(TAG, "onImageAvailable: null");
-            }
         }
     }
 
+
+    class MyJPEGOnImageAvailableListener implements ImageReader.OnImageAvailableListener {
+
+        @Override
+        public void onImageAvailable(ImageReader imageReader) {
+            //Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            num++;
+            if (num > 100) {
+                Toast.makeText(CameraActivity.this, "照片够多了", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            //Log.d(TAG, "onImageAvailable: saveimage " + num);
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmssSSS").format(new Date());
+            String filepath = "/sdcard/Camera2/" + timeStamp + "_" + num + ".jpg";
+            Log.d(TAG, "onImageAvailable: saveimage in " + filepath + num);
+
+            mBackgroundHandler.post(new JPEGImageSaver(imageReader.acquireNextImage(),filepath));
+
+        }
+    }
     /**
      * 长按连拍
      */
@@ -1275,7 +1536,6 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         @Override
         public boolean onLongClick(View view) {
             //设置最大张数限制
-
             //连拍
             takePictures();
             return true;
@@ -1289,7 +1549,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         try {
             takePictureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             // 将imageReader的surface作为CaptureRequest.Builder的目标
-            takePictureRequestBuilder.addTarget(imageReader.getSurface());
+            takePictureRequestBuilder.addTarget(imageReaderYUV.getSurface());
             takePictureRequestBuilder.addTarget(surfaceHolder.getSurface());
             // 自动对焦
             takePictureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
@@ -1397,7 +1657,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
 
             takePictureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             // 将imageReader的surface作为CaptureRequest.Builder的目标
-            takePictureRequestBuilder.addTarget(imageReader.getSurface());
+            takePictureRequestBuilder.addTarget(imageReaderJPEG.getSurface());
             takePictureRequestBuilder.addTarget(surfaceHolder.getSurface());
             //takePictureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
             //设置连续帧
@@ -1508,7 +1768,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
             previewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_AUTO);
             // 创建CameraCaptureSession，该对象负责管理处理预览请求和拍照请求
-            mCameraDevice.createCaptureSession(Arrays.asList(surfaceHolder.getSurface(), imageReader.getSurface()), new CameraCaptureSession.StateCallback() // ③
+            mCameraDevice.createCaptureSession(Arrays.asList(surfaceHolder.getSurface(), imageReaderYUV.getSurface(),imageReaderJPEG.getSurface()), new CameraCaptureSession.StateCallback() // ③
             {
                 @Override
                 public void onConfigured(CameraCaptureSession cameraCaptureSession) {
@@ -1542,13 +1802,13 @@ public class CameraActivity extends Activity implements View.OnClickListener {
 
     }
 
-    private int pictureNum = 0;
+
     private CameraCaptureSession.CaptureCallback myCaptureCallback = new CameraCaptureSession.CaptureCallback() {
 
         @Override
         public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, long timestamp, long frameNumber) {
             super.onCaptureStarted(session, request, timestamp, frameNumber);
-            Log.d(TAG, "onCaptureStarted: ");
+            //Log.d(TAG, "onCaptureStarted: ");
         }
 
         private void process(CaptureResult result) {
@@ -1558,51 +1818,33 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                     break;
                 }
                 case STATE_CAPTURE:
-//                    try {
-//                        mCameraCaptureSession.stopRepeating();
-//                    } catch (CameraAccessException e) {
-//                        e.printStackTrace();
-//                    }
                     if (pictureNum > 30) {
                         mState = STATE_PREVIEW;
-                        pictureNum = 0;
+                        pictureNum = 1;
+                        isSetBuilder = false;
+                        messageHandler.sendEmptyMessage(TOASTGONE);
                         return;
                     }
-                    pictureNum++;
-                    new AsyncTask<Void, Void, Void>() {
-
-                        @Override
-                        protected void onPreExecute() {
-
+                    //Log.d(TAG, "process:pictureNum " + pictureNum);
+                    try {
+                        if(!isSetBuilder) {
+                            initTakePictureBuilder();
+                            Log.d(TAG, "process: builder init");
+                            isSetBuilder = true;
                         }
-
-                        @Override
-                        protected Void doInBackground(Void... params) {
-                            try {
-                                takePictureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_ZERO_SHUTTER_LAG);
-                                // 将imageReader的surface作为CaptureRequest.Builder的目标
-                                takePictureRequestBuilder.addTarget(imageReader.getSurface());
-                                takePictureRequestBuilder.addTarget(surfaceHolder.getSurface());
-                                // 自动对焦
-                                takePictureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-                                // 自动曝光
-                                takePictureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-                                // 获取手机方向
-                                int rotation = getWindowManager().getDefaultDisplay().getRotation();
-                                // 根据设备方向计算设置照片的方向
-                                takePictureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATIONS.get(rotation));
-                                mCameraCaptureSession.capture(takePictureRequestBuilder.build(), null, handler2);
-                            } catch (CameraAccessException e) {
-                                e.printStackTrace();
+                        mainHandler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                tv_messagetoast.setText(pictureNum + "");
                             }
-                            return null;
-                        }
+                        });
+                        pictureNum++;
+                        mCameraCaptureSession.capture(takePictureRequestBuilder.build(), null, handler2);
+                    } catch (CameraAccessException e) {
+                        e.printStackTrace();
+                    }
 
-                        @Override
-                        protected void onPostExecute(Void aVoid) {
 
-                        }
-                    }.execute();
                     break;
                 case STATE_REPRE:
                     updatePreview1();
@@ -1615,7 +1857,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         public void onCaptureProgressed(@NonNull CameraCaptureSession session,
                                         @NonNull CaptureRequest request,
                                         @NonNull CaptureResult partialResult) {
-            Log.d(TAG, "onCaptureProgressed: ");
+            //Log.d(TAG, "onCaptureProgressed: ");
             //process(partialResult);
         }
 
@@ -1623,7 +1865,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                        @NonNull CaptureRequest request,
                                        @NonNull TotalCaptureResult result) {
-            Log.d(TAG, "onCaptureCompleted: ");
+            //Log.d(TAG, "onCaptureCompleted: ");
             mCameraCaptureSession = session;
             process(result);
         }
@@ -1632,7 +1874,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureFailure failure) {
             super.onCaptureFailed(session, request, failure);
             mCameraCaptureSession = session;
-            Log.d(TAG, "onCaptureFailed: ");
+            //Log.d(TAG, "onCaptureFailed: ");
         }
 
         @Override
@@ -1643,15 +1885,31 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         @Override
         public void onCaptureSequenceAborted(@NonNull CameraCaptureSession session, int sequenceId) {
             super.onCaptureSequenceAborted(session, sequenceId);
-            Log.d(TAG, "onCaptureSequenceAborted: ");
+            //Log.d(TAG, "onCaptureSequenceAborted: ");
         }
 
         @Override
         public void onCaptureBufferLost(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull Surface target, long frameNumber) {
             super.onCaptureBufferLost(session, request, target, frameNumber);
-            Log.d(TAG, "onCaptureBufferLost: ");
+            //Log.d(TAG, "onCaptureBufferLost: ");
         }
     };
+
+    private void initTakePictureBuilder() throws CameraAccessException {
+        takePictureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_ZERO_SHUTTER_LAG);
+        // 将imageReader的surface作为CaptureRequest.Builder的目标
+        takePictureRequestBuilder.addTarget(imageReaderYUV.getSurface());
+        takePictureRequestBuilder.addTarget(surfaceHolder.getSurface());
+        // 自动对焦
+        takePictureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+        // 自动曝光
+        takePictureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+        // 获取手机方向
+        int rotation = getWindowManager().getDefaultDisplay().getRotation();
+        // 根据设备方向计算设置照片的方向
+        takePictureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATIONS.get(rotation));
+
+    }
 
     @Override
     protected void onStop() {
