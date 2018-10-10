@@ -36,7 +36,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import wseemann.media.FFmpegMediaMetadataRetriever;
 
 public class RadioActivity extends Activity implements View.OnClickListener {
-
+    private static final String TAG = "RadioActivity";
     private SurfaceView svRadio;
     private Button vbStartradio;
     private ImageView iv_photes;
@@ -50,6 +50,8 @@ public class RadioActivity extends Activity implements View.OnClickListener {
      * 是否开始录像
      */
     private Boolean start;
+    private Profile profile;
+
     /**
      * Find the Views in the layout<br />
      * <br />
@@ -98,12 +100,12 @@ public class RadioActivity extends Activity implements View.OnClickListener {
 
         camera = Camera.open(0);
         setCamera();
-        /*try {
+        try {
             camera.setPreviewDisplay(surfaceHolder);
             camera.startPreview();
         } catch (IOException e) {
             e.printStackTrace();
-        }*/
+        }
 
 
     }
@@ -114,6 +116,8 @@ public class RadioActivity extends Activity implements View.OnClickListener {
     private void setCamera() {
         Camera.Parameters parameters = camera.getParameters();
         parameters.setFlashMode( Camera.Parameters.FLASH_MODE_ON);
+        parameters.set("video-hfr","100");
+        parameters.setColorEffect(Camera.Parameters.EFFECT_NEGATIVE);
         parameters.setPictureFormat(ImageFormat.JPEG);
         //parameters.setPreviewSize(800, 1200);
         //持续对焦
@@ -163,6 +167,9 @@ public class RadioActivity extends Activity implements View.OnClickListener {
      * 开始录像
      */
     private void startRecording() {
+
+        profile = new Profile();
+        profile.initCamcorderProfile(0, 2003);
         camera.unlock();
 
         mediaRecorder = new MediaRecorder();
@@ -170,26 +177,35 @@ public class RadioActivity extends Activity implements View.OnClickListener {
 
         //设置的顺序尽量按照下面的顺序否则会出错
         //视频源
-        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.DEFAULT);
+        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
         //mediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH));
-        //音频源
-        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
-        //输出格式
-        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-        //音频编码
-        mediaRecorder.setAudioEncoder( MediaRecorder.AudioEncoder.AMR_NB);
-        //视频编码
-        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.MPEG_4_SP);
+
+        mediaRecorder.setOutputFormat(profile.getFileFormat());
+        mediaRecorder.setVideoFrameRate(profile.getVideoFrameRate());
+        mediaRecorder.setVideoSize(profile.getVideoFrameWidth(),
+                profile.getVideoFrameHeight());
+        mediaRecorder.setVideoEncodingBitRate(profile.getVideoBitRate());
+        mediaRecorder.setVideoEncoder(profile.getVideoEncoder());
+        mediaRecorder.setCaptureRate(100);
+
+//        //音频源
+//        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
+//        //输出格式
+//        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+//        //音频编码
+//        mediaRecorder.setAudioEncoder( MediaRecorder.AudioEncoder.AMR_NB);
+//        //视频编码
+//        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.MPEG_4_SP);
 
         //视频输出文件
         mediaRecorder.setOutputFile(mFileName);
-        //设置视频大小
-        mediaRecorder.setVideoSize(1920, 1080);
-        //设置视频码率
-        mediaRecorder.setVideoEncodingBitRate(5 * 1024 * 1024);
-        //设置视频的帧，
-        mediaRecorder.setVideoFrameRate(24);
-        //旋转图像
+//        //设置视频大小
+//        mediaRecorder.setVideoSize(1920, 1080);
+//        //设置视频码率
+//        mediaRecorder.setVideoEncodingBitRate(5 * 1024 * 1024);
+//        //设置视频的帧，
+//        mediaRecorder.setVideoFrameRate(24);
+//        //旋转图像
         mediaRecorder.setOrientationHint(90);
 
 
@@ -222,7 +238,7 @@ public class RadioActivity extends Activity implements View.OnClickListener {
         camera.lock();
         mediaRecorder = null;
         //保存连拍图片
-        saveImages();
+//        saveImages();
     }
 
     /**

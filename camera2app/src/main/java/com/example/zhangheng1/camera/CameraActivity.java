@@ -672,6 +672,8 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                 //闪光灯开启或关闭
                 //开启或关闭闪光灯
                 Toast.makeText(CameraActivity.this, "闪光灯", Toast.LENGTH_SHORT).show();
+                previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                        CameraMetadata.CONTROL_AE_MODE_ON);
                 if (LIGHTOPENORCLOSE == CaptureRequest.FLASH_MODE_OFF) {
                     LIGHTOPENORCLOSE = CaptureRequest.FLASH_MODE_TORCH;
                     messageHandler.sendEmptyMessage(LIGHTOPEN);
@@ -1045,7 +1047,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                 Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
                 new CompareSizesByArea());
         //设置最大的图像尺寸
-        imageReaderYUV = ImageReader.newInstance(1920, 1080, ImageFormat.YUV_420_888, 35);
+        imageReaderYUV = ImageReader.newInstance(1080,1920, ImageFormat.YUV_420_888, 35);
         imageReaderJPEG = ImageReader.newInstance(largest.getWidth(), largest.getHeight(), ImageFormat.JPEG, 10);
         imageReaderYUV.setOnImageAvailableListener(new MyOnImageAvailableListener(), mainHandler);
         imageReaderJPEG.setOnImageAvailableListener(new MyJPEGOnImageAvailableListener(), mainHandler);
@@ -1150,7 +1152,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         Image.Plane[] planes = image.getPlanes();
         byte[] data = new byte[width * height * ImageFormat.getBitsPerPixel(format) / 8];
         byte[] rowData = new byte[planes[0].getRowStride()];
-        if (false) Log.v(TAG, "get data from " + planes.length + " planes");
+        if (true) Log.v(TAG, "get data from " + planes.length + " planes");
         int channelOffset = 0;
         int outputStride = 1;
         for (int i = 0; i < planes.length; i++) {
@@ -1181,7 +1183,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             ByteBuffer buffer = planes[i].getBuffer();
             int rowStride = planes[i].getRowStride();
             int pixelStride = planes[i].getPixelStride();
-            if (false) {
+            if (true) {
                 Log.v(TAG, "pixelStride " + pixelStride);
                 Log.v(TAG, "rowStride " + rowStride);
                 Log.v(TAG, "width " + width);
@@ -1191,6 +1193,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             int shift = (i == 0) ? 0 : 1;
             int w = width >> shift;
             int h = height >> shift;
+            //Log.d(TAG, "getDataFromImage: " + (rowStride * (crop.top >> shift) + pixelStride * (crop.left >> shift)));
             buffer.position(rowStride * (crop.top >> shift) + pixelStride * (crop.left >> shift));
             for (int row = 0; row < h; row++) {
                 int length;
@@ -1207,10 +1210,11 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                     }
                 }
                 if (row < h - 1) {
+                    //Log.d(TAG, "getDataFromImage: " + buffer.position());
                     buffer.position(buffer.position() + rowStride - length);
                 }
             }
-            if (false) Log.v(TAG, "Finished reading data from plane " + i);
+            if (true) Log.v(TAG, "Finished reading data from plane " + i);
         }
         return data;
     }
@@ -1237,9 +1241,16 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             throw new RuntimeException("Unable to create output file " + fileName, ioe);
         }
         Rect rect = image.getCropRect();
-        YuvImage yuvImage = new YuvImage(getDataFromImage(image, COLOR_FormatNV21), ImageFormat.NV21, rect.width(), rect.height(), null);
+
+        Long time1 = System.currentTimeMillis();
+//        rotateYUV420Degree90(getDataFromImage(image, COLOR_FormatNV21),rect.width(),rect.height())
+           //YuvImage yuvImage = new YuvImage(getDataFromImage(image, COLOR_FormatNV21), ImageFormat.NV21,rect.width() , rect.height(), null);
+        YuvImage yuvImage = new YuvImage(rotateYUV420Degree90(getDataFromImage(image, COLOR_FormatNV21),rect.width(),rect.height()), ImageFormat.NV21 , rect.height(),rect.width(), null);
         //rotateBitmap(yuvImage,90,rect,fileName);
-        yuvImage.compressToJpeg(rect, 100, outStream);
+        yuvImage.compressToJpeg(new Rect(0,0,rect.height(),rect.width()), 100, outStream);
+//        yuvImage.compressToJpeg(rect, 100, outStream);
+        Long time2 = System.currentTimeMillis();
+        Log.d(TAG, "compressToJpeg: time" + (time2 - time1));
 
     }
     private static void rotateBitmap(YuvImage yuvImage, int orientation, Rect rectangle,String fileName)
@@ -1664,6 +1675,8 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             Range<Integer> fps[] = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
             takePictureRequestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, fps[fps.length - 1]);//设置每秒30帧
             //得到方向
+            takePictureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                    CameraMetadata.CONTROL_AE_MODE_ON);
             takePictureRequestBuilder.set(CaptureRequest.FLASH_MODE, LIGHTOPENORCLOSE);
             int rotation = getWindowManager().getDefaultDisplay().getRotation();
             // 根据设备方向计算设置照片的方向

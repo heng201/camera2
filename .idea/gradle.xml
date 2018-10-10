@@ -8,14 +8,20 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/aidlclient" />
+            <option value="$PROJECT_DIR$/aidlservice" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/brightness" />
+            <option value="$PROJECT_DIR$/browsertest" />
             <option value="$PROJECT_DIR$/camera1andcamera2" />
             <option value="$PROJECT_DIR$/camera1app" />
             <option value="$PROJECT_DIR$/camera2app" />
             <option value="$PROJECT_DIR$/filter" />
             <option value="$PROJECT_DIR$/glsurfaceview" />
             <option value="$PROJECT_DIR$/magicfilter" />
+            <option value="$PROJECT_DIR$/managedprofile" />
             <option value="$PROJECT_DIR$/myfilter" />
+            <option value="$PROJECT_DIR$/notification" />
             <option value="$PROJECT_DIR$/radio" />
           </set>
         </option>

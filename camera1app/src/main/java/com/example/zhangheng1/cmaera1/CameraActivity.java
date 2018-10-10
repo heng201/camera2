@@ -2,7 +2,7 @@ package com.example.zhangheng1.cmaera1;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.FragmentBreadCrumbs;
+
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -14,15 +14,16 @@ import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaRecorder;
-import android.opengl.ETC1;
+
 import android.os.Handler;
 import android.os.Message;
 import android.os.Bundle;
+
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
-import android.text.Editable;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -42,7 +43,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -587,11 +587,38 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             handler.sendMessage(msg1);
 
         int orientation = CameraActivity.this.getResources().getConfiguration().orientation;
-        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            camera.setDisplayOrientation(180);
-        } else if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-            camera.setDisplayOrientation(90);
+        Log.d(TAG, "setCamera: " + orientation);
+        System.out.print("setCamera: " + orientation);
+        setCameraDisplayOrientation(this,CAMERAID,camera);
+//        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+//            camera.setDisplayOrientation(180);
+//        } else if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+//            camera.setDisplayOrientation(90);
+//        }
+    }
+    public static void setCameraDisplayOrientation(Activity activity,
+                                                   int cameraId, android.hardware.Camera camera) {
+        android.hardware.Camera.CameraInfo info =
+                new android.hardware.Camera.CameraInfo();
+        android.hardware.Camera.getCameraInfo(cameraId, info);
+        int rotation = activity.getWindowManager().getDefaultDisplay()
+                .getRotation();
+        int degrees = 0;
+        switch (rotation) {
+            case Surface.ROTATION_0: degrees = 0; break;
+            case Surface.ROTATION_90: degrees = 90; break;
+            case Surface.ROTATION_180: degrees = 180; break;
+            case Surface.ROTATION_270: degrees = 270; break;
         }
+
+        int result;
+        if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+            result = (info.orientation + degrees) % 360;
+            result = (360 - result) % 360;  // compensate the mirror
+        } else {  // back-facing
+            result = (info.orientation - degrees + 360) % 360;
+        }
+        camera.setDisplayOrientation(result);
     }
 
     public static Camera.Size getLargePreviewSize(Camera camera){

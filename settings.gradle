@@ -1,1 +1,1 @@
-include ':app', ':camera1app', ':radio', ':camera2app', ':camera1andcamera2', ':magicfilter', ':filter', ':glsurfaceview', ':myfilter'
+include ':app', ':camera1app', ':radio', ':camera2app', ':camera1andcamera2', ':magicfilter', ':filter', ':glsurfaceview', ':myfilter', ':brightness', ':brightness', ':browsertest', ':browsertest', ':managedprofile', ':aidlservice', ':aidlclient', ':aidlclient', ':notification'
