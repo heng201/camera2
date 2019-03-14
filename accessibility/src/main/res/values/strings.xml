@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">看吃鸡</string>
+    <string name="button">捕获内容</string>
+    <string name="content">显示捕获的内容</string>
+    <string name="douyin">抖音看吃鸡</string>
+    <string name="weixin">发微信消息</string>
+    <string name="instrumentation">模拟点击</string>
+    <string name="onclick">接收点击</string>
+    <string name="contact">联系人</string>
+    <string name="et_content">发送的内容</string>
+
+</resources>
